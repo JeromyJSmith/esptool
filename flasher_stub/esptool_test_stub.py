@@ -24,7 +24,11 @@ import esptool  # noqa: E402
 
 # Python hackiness: evaluate the snippet in the context of the esptool module, so it
 # edits the esptool's global variables
-exec(open("%s/build/stub_flasher_snippet.py" % THIS_DIR).read(), esptool.__dict__, esptool.__dict__)
+exec(
+    open(f"{THIS_DIR}/build/stub_flasher_snippet.py").read(),
+    esptool.__dict__,
+    esptool.__dict__,
+)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ class EspSecureTestCase(unittest.TestCase):
         Returns output as a string if there is any, raises an exception if espsecure.py fails
         """
         cmd = [sys.executable, ESPSECURE_PY] + args.split(" ")
-        print("Running %s..." % (" ".join(cmd)))
+        print(f'Running {" ".join(cmd)}...')
 
         try:
             output = subprocess.check_output([str(s) for s in cmd],
@@ -506,7 +506,9 @@ class DigestTests(EspSecureTestCase):
             self.addCleanup(os.remove, f.name)
             outfile_name = f.name
 
-        self.run_espsecure('digest_private_key --keyfile secure_images/ecdsa_secure_boot_signing_key.pem {}'.format(outfile_name))
+        self.run_espsecure(
+            f'digest_private_key --keyfile secure_images/ecdsa_secure_boot_signing_key.pem {outfile_name}'
+        )
 
         with open(outfile_name, 'rb') as f:
             self.assertEqual(f.read(), binascii.unhexlify('7b7b53708fc89d5e0b2df2571fb8f9d778f61a422ff1101a22159c4b34aad0aa'))
@@ -515,10 +517,12 @@ class DigestTests(EspSecureTestCase):
         fname = 'secure_images/ecdsa_secure_boot_signing_key.pem'
 
         with self.assertRaises(subprocess.CalledProcessError):
-            self.run_espsecure('digest_private_key --keyfile {} {}'.format(fname, fname))
+            self.run_espsecure(f'digest_private_key --keyfile {fname} {fname}')
 
 
 if __name__ == '__main__':
     print("Running espsecure tests...")
-    print("Using espsecure %s at %s" % (esptool.__version__, os.path.abspath(espsecure.__file__)))
+    print(
+        f"Using espsecure {esptool.__version__} at {os.path.abspath(espsecure.__file__)}"
+    )
     unittest.main(buffer=True)

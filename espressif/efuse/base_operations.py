@@ -117,19 +117,16 @@ def summary(esp, efuses, args):
     human_output = (args.format == 'summary')
     json_efuse = {}
     if args.file != sys.stdout:
-        print("Saving efuse values to " + args.file.name)
+        print(f"Saving efuse values to {args.file.name}")
     if human_output:
         print(ROW_FORMAT.replace("-50", "-12") % ("EFUSE_NAME (Block)", "Description", "", "[Meaningful Value]", "[Readable/Writeable]", "(Hex Value)"),
               file=args.file)
         print("-" * 88, file=args.file)
-    for category in sorted(set(e.category for e in efuses), key=lambda c: c.title()):
+    for category in sorted({e.category for e in efuses}, key=lambda c: c.title()):
         if human_output:
-            print("%s fuses:" % category.title(), file=args.file)
+            print(f"{category.title()} fuses:", file=args.file)
         for e in (e for e in efuses if e.category == category):
-            if e.efuse_type.startswith("bytes"):
-                raw = ""
-            else:
-                raw = "({})".format(e.get_bitstring())
+            raw = "" if e.efuse_type.startswith("bytes") else f"({e.get_bitstring()})"
             (readable, writeable) = (e.is_readable(), e.is_writeable())
             if readable and writeable:
                 perms = "R/W"
@@ -145,8 +142,7 @@ def summary(esp, efuses, args):
                 value = value.replace("0", "?")
             if human_output:
                 print(ROW_FORMAT % (e.get_info(), e.description[:50], "\n  " if len(value) > 20 else "", value, perms, raw), file=args.file)
-                desc_len = len(e.description[50:])
-                if desc_len:
+                if desc_len := len(e.description[50:]):
                     desc_len += 50
                     for i in range(50, desc_len, 50):
                         print("%-40s %-50s" % ("", e.description[i:(50 + i)]), file=args.file)
@@ -167,8 +163,7 @@ def summary(esp, efuses, args):
             print("", file=args.file)
     if human_output:
         print(efuses.summary(), file=args.file)
-        warnings = efuses.get_coding_scheme_warnings()
-        if warnings:
+        if warnings := efuses.get_coding_scheme_warnings():
             print("WARNING: Coding scheme has encoding bit error warnings (0x%x)" % warnings, file=args.file)
         if args.file != sys.stdout:
             args.file.close()
@@ -201,10 +196,10 @@ def burn_efuse(esp, efuses, args):
             for i in range(0, len(blocked_efuses_after_burn), 5):
                 print("              ", "".join("{}".format(blocked_efuses_after_burn[i:i + 5:])))
 
-    efuse_name_list = [name for name in args.name_value_pairs.keys()]
+    efuse_name_list = list(args.name_value_pairs.keys())
     burn_efuses_list = [efuses[name] for name in efuse_name_list]
     old_value_list = [efuses[name].get_raw() for name in efuse_name_list]
-    new_value_list = [value for value in args.name_value_pairs.values()]
+    new_value_list = list(args.name_value_pairs.values())
     util.check_duplicate_name_in_list(efuse_name_list)
 
     attention = ""
@@ -214,7 +209,7 @@ def burn_efuse(esp, efuses, args):
         if len(burn_list_a_block):
             print("  from BLOCK%d" % (block.id))
             for field in burn_list_a_block:
-                print("     - %s" % (field.name))
+                print(f"     - {field.name}")
                 if efuses.blocks[field.block].get_coding_scheme() != efuses.REGS.CODING_SCHEME_NONE:
                     using_the_same_block_names = [e.name for e in efuses if e.block == field.block]
                     wr_names = [e.name for e in burn_list_a_block]
@@ -234,12 +229,19 @@ def burn_efuse(esp, efuses, args):
     raise_error = False
     for efuse, old_value, new_value in zip(burn_efuses_list, old_value_list, new_value_list):
         if not efuse.is_readable():
-            print("Efuse %s is read-protected. Read back the burn value is not possible." % efuse.name)
+            print(
+                f"Efuse {efuse.name} is read-protected. Read back the burn value is not possible."
+            )
         else:
             new_value = efuse.convert_to_bitstring(new_value)
             burned_value = efuse.get_bitstring()
             if burned_value != new_value:
-                print(burned_value, "->", new_value, "Efuse %s failed to burn. Protected?" % efuse.name)
+                print(
+                    burned_value,
+                    "->",
+                    new_value,
+                    f"Efuse {efuse.name} failed to burn. Protected?",
+                )
                 raise_error = True
     if raise_error:
         raise esptool.FatalError("The burn was not successful.")
@@ -253,12 +255,14 @@ def read_protect_efuse(esp, efuses, args):
     for efuse_name in args.efuse_name:
         efuse = efuses[efuse_name]
         if not efuse.is_readable():
-            print("Efuse %s is already read protected" % efuse.name)
+            print(f"Efuse {efuse.name} is already read protected")
         else:
             # make full list of which efuses will be disabled (ie share a read disable bit)
             all_disabling = [e for e in efuses if e.read_disable_bit == efuse.read_disable_bit]
             names = ", ".join(e.name for e in all_disabling)
-            print("Permanently read-disabling efuse%s %s" % ("s" if len(all_disabling) > 1 else "", names))
+            print(
+                f'Permanently read-disabling efuse{"s" if len(all_disabling) > 1 else ""} {names}'
+            )
             efuse.disable_read()
     efuses.burn_all()
 
@@ -267,7 +271,7 @@ def read_protect_efuse(esp, efuses, args):
     for efuse_name in args.efuse_name:
         efuse = efuses[efuse_name]
         if efuse.is_readable():
-            print("Efuse %s is not read-protected." % efuse.name)
+            print(f"Efuse {efuse.name} is not read-protected.")
             raise_error = True
     if raise_error:
         raise esptool.FatalError("The burn was not successful.")
@@ -280,12 +284,14 @@ def write_protect_efuse(esp, efuses, args):
     for efuse_name in args.efuse_name:
         efuse = efuses[efuse_name]
         if not efuse.is_writeable():
-            print("Efuse %s is already write protected" % efuse.name)
+            print(f"Efuse {efuse.name} is already write protected")
         else:
             # make full list of which efuses will be disabled (ie share a write disable bit)
             all_disabling = [e for e in efuses if e.write_disable_bit == efuse.write_disable_bit]
             names = ", ".join(e.name for e in all_disabling)
-            print("Permanently write-disabling efuse%s %s" % ("s" if len(all_disabling) > 1 else "", names))
+            print(
+                f'Permanently write-disabling efuse{"s" if len(all_disabling) > 1 else ""} {names}'
+            )
             efuse.disable_write()
     efuses.burn_all()
 
@@ -294,7 +300,7 @@ def write_protect_efuse(esp, efuses, args):
     for efuse_name in args.efuse_name:
         efuse = efuses[efuse_name]
         if efuse.is_writeable():
-            print("Efuse %s is not write-protected." % efuse.name)
+            print(f"Efuse {efuse.name} is not write-protected.")
             raise_error = True
     if raise_error:
         raise esptool.FatalError("The burn was not successful.")
@@ -303,21 +309,24 @@ def write_protect_efuse(esp, efuses, args):
 
 
 def burn_block_data(esp, efuses, args):
-    block_name_list = args.block[0:len([name for name in args.block if name is not None]):]
-    datafile_list = args.datafile[0:len([name for name in args.datafile if name is not None]):]
+    block_name_list = args.block[
+        : len([name for name in args.block if name is not None])
+    ]
+    datafile_list = args.datafile[
+        : len([name for name in args.datafile if name is not None])
+    ]
     efuses.force_write_always = args.force_write_always
 
     util.check_duplicate_name_in_list(block_name_list)
     if args.offset and len(block_name_list) > 1:
         raise esptool.FatalError("The 'offset' option is not applicable when a few blocks are passed. With 'offset', should only one block be used.")
-    else:
-        offset = args.offset
-        if offset:
-            num_block = efuses.get_index_block_by_name(block_name_list[0])
-            block = efuses.blocks[num_block]
-            num_bytes = block.get_block_len()
-            if offset >= num_bytes:
-                raise esptool.FatalError("Invalid offset: the block%d only holds %d bytes." % (block.id, num_bytes))
+    offset = args.offset
+    if offset:
+        num_block = efuses.get_index_block_by_name(block_name_list[0])
+        block = efuses.blocks[num_block]
+        num_bytes = block.get_block_len()
+        if offset >= num_bytes:
+            raise esptool.FatalError("Invalid offset: the block%d only holds %d bytes." % (block.id, num_bytes))
     if len(block_name_list) != len(datafile_list):
         raise esptool.FatalError("The number of block_name (%d) and datafile (%d) should be the same." % (len(block_name_list), len(datafile_list)))
 

@@ -59,7 +59,7 @@ class EspPortManager(serial.rfc2217.PortManager):
         super(EspPortManager, self).__init__(serial_port, connection, logger)
 
     def _telnet_process_subnegotiation(self, suboption):
-        if suboption[0:1] == COM_PORT_OPTION and suboption[1:2] == SET_CONTROL:
+        if suboption[:1] == COM_PORT_OPTION and suboption[1:2] == SET_CONTROL:
             if suboption[2:3] == SET_CONTROL_DTR_OFF:
                 self.serial.dtr = False
                 return
@@ -141,12 +141,11 @@ class Redirector(object):
         self.log.debug('reader thread started')
         while self.alive:
             try:
-                data = self.serial.read(self.serial.in_waiting or 1)
-                if data:
+                if data := self.serial.read(self.serial.in_waiting or 1):
                     # escape outgoing data when needed (Telnet IAC (0xff) character)
                     self.write(b''.join(self.rfc2217.escape(data)))
             except socket.error as msg:
-                self.log.error('{}'.format(msg))
+                self.log.error(f'{msg}')
                 # probably got disconnected
                 break
         self.alive = False
@@ -161,12 +160,12 @@ class Redirector(object):
         """loop forever and copy socket->serial"""
         while self.alive:
             try:
-                data = self.socket.recv(1024)
-                if not data:
+                if data := self.socket.recv(1024):
+                    self.serial.write(b''.join(self.rfc2217.filter(data)))
+                else:
                     break
-                self.serial.write(b''.join(self.rfc2217.filter(data)))
             except socket.error as msg:
-                self.log.error('{}'.format(msg))
+                self.log.error(f'{msg}')
                 # probably got disconnected
                 break
         self.stop()
@@ -216,8 +215,7 @@ it waits for the next connect.
 
     args = parser.parse_args()
 
-    if args.verbosity > 3:
-        args.verbosity = 3
+    args.verbosity = min(args.verbosity, 3)
     level = (logging.WARNING,
              logging.INFO,
              logging.DEBUG,
@@ -238,21 +236,21 @@ it waits for the next connect.
     try:
         ser.open()
     except serial.SerialException as e:
-        logging.error("Could not open serial port {}: {}".format(ser.name, e))
+        logging.error(f"Could not open serial port {ser.name}: {e}")
         sys.exit(1)
 
-    logging.info("Serving serial port: {}".format(ser.name))
+    logging.info(f"Serving serial port: {ser.name}")
     settings = ser.get_settings()
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(('', args.localport))
     srv.listen(1)
-    logging.info("TCP/IP port: {}".format(args.localport))
+    logging.info(f"TCP/IP port: {args.localport}")
     while True:
         try:
             client_socket, addr = srv.accept()
-            logging.info('Connected by {}:{}'.format(addr[0], addr[1]))
+            logging.info(f'Connected by {addr[0]}:{addr[1]}')
             client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             ser.rts = True
             ser.dtr = True

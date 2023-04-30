@@ -57,9 +57,9 @@ class EfuseTestCase(unittest.TestCase):
     def setUp(self):
         if reset_port is None:
             self.efuse_file = tempfile.NamedTemporaryFile()
-            self.base_cmd = "python ../espefuse.py --chip {} --virt --path-efuse-file {} -d ".format(chip_target, self.efuse_file.name)
+            self.base_cmd = f"python ../espefuse.py --chip {chip_target} --virt --path-efuse-file {self.efuse_file.name} -d "
         else:
-            self.base_cmd = "python ../espefuse.py --chip {} -p {} -d ".format(chip_target, espefuse_port)
+            self.base_cmd = f"python ../espefuse.py --chip {chip_target} -p {espefuse_port} -d "
             self.reset_efuses()
 
     def tearDown(self):
@@ -140,7 +140,7 @@ class TestReadCommands(EfuseTestCase):
 
     def test_help(self):
         self.espefuse_not_virt_py("--help")
-        self.espefuse_not_virt_py("--chip %s --help" % (chip_target))
+        self.espefuse_not_virt_py(f"--chip {chip_target} --help")
 
     def test_dump(self):
         self.espefuse_py("dump -h")
@@ -227,8 +227,8 @@ class TestBurnCommands(EfuseTestCase):
                            SPI_PAD_CONFIG_D4 SPI_PAD_CONFIG_D5 SPI_PAD_CONFIG_D6 SPI_PAD_CONFIG_D7 WAFER_VERSION PKG_VERSION BLOCK1_VERSION OPTIONAL_UNIQUE_ID
                            BLOCK2_VERSION BLOCK_USR_DATA BLOCK_KEY0 BLOCK_KEY1 BLOCK_KEY2 BLOCK_KEY3 BLOCK_KEY4 BLOCK_KEY5'''
             efuse_lists2 = 'RD_DIS DIS_RTC_RAM_BOOT'
-        self.espefuse_py('write_protect_efuse {}'.format(efuse_lists))
-        output = self.espefuse_py('write_protect_efuse {}'.format(efuse_lists2))
+        self.espefuse_py(f'write_protect_efuse {efuse_lists}')
+        output = self.espefuse_py(f'write_protect_efuse {efuse_lists2}')
         self.assertEqual(2, output.count("is already write protected"))
 
     def test_write_protect_efuse2(self):
@@ -274,19 +274,28 @@ class TestBurnCommands(EfuseTestCase):
     def test_set_flash_voltage_1_8v(self):
         self.espefuse_py("set_flash_voltage -h")
         vdd = "VDD_SDIO" if chip_target == "esp32" else "VDD_SPI"
-        self.espefuse_py('set_flash_voltage 1.8V', check_msg='Set internal flash voltage regulator (%s) to 1.8V.' % vdd)
+        self.espefuse_py(
+            'set_flash_voltage 1.8V',
+            check_msg=f'Set internal flash voltage regulator ({vdd}) to 1.8V.',
+        )
         if chip_target == "esp32":
             error_msg = "A fatal error occurred: Can't set flash regulator to OFF as XPD_SDIO_REG efuse is already burned"
         else:
             error_msg = "A fatal error occurred: Can't set flash regulator to OFF as VDD_SPI_XPD efuse is already burned"
-        self.espefuse_py('set_flash_voltage 3.3V', check_msg='Enable internal flash voltage regulator (%s) to 3.3V.' % vdd)
+        self.espefuse_py(
+            'set_flash_voltage 3.3V',
+            check_msg=f'Enable internal flash voltage regulator ({vdd}) to 3.3V.',
+        )
         self.espefuse_py('set_flash_voltage OFF', check_msg=error_msg, ret_code=2)
 
     @unittest.skipIf(chip_target == "esp32c3", "TODO: add support set_flash_voltage for ESP32-C3")
     @unittest.skipIf(chip_target == "esp32h2", "TODO: add support set_flash_voltage for ESP32-H2")
     def test_set_flash_voltage_3_3v(self):
         vdd = "VDD_SDIO" if chip_target == "esp32" else "VDD_SPI"
-        self.espefuse_py('set_flash_voltage 3.3V', check_msg='Enable internal flash voltage regulator (%s) to 3.3V.' % vdd)
+        self.espefuse_py(
+            'set_flash_voltage 3.3V',
+            check_msg=f'Enable internal flash voltage regulator ({vdd}) to 3.3V.',
+        )
         if chip_target == "esp32":
             error_msg = "A fatal error occurred: Can't set regulator to 1.8V is XPD_SDIO_TIEH efuse is already burned"
         else:
@@ -303,15 +312,27 @@ class TestBurnCommands(EfuseTestCase):
     @unittest.skipIf(chip_target == "esp32h2", "TODO: add support set_flash_voltage for ESP32-H2")
     def test_set_flash_voltage_off(self):
         vdd = "VDD_SDIO" if chip_target == "esp32" else "VDD_SPI"
-        self.espefuse_py('set_flash_voltage OFF', check_msg='Disable internal flash voltage regulator (%s)' % vdd)
-        self.espefuse_py('set_flash_voltage 3.3V', check_msg='Enable internal flash voltage regulator (%s) to 3.3V.' % vdd)
+        self.espefuse_py(
+            'set_flash_voltage OFF',
+            check_msg=f'Disable internal flash voltage regulator ({vdd})',
+        )
+        self.espefuse_py(
+            'set_flash_voltage 3.3V',
+            check_msg=f'Enable internal flash voltage regulator ({vdd}) to 3.3V.',
+        )
 
     @unittest.skipIf(chip_target == "esp32c3", "TODO: add support set_flash_voltage for ESP32-C3")
     @unittest.skipIf(chip_target == "esp32h2", "TODO: add support set_flash_voltage for ESP32-H2")
     def test_set_flash_voltage_off2(self):
         vdd = "VDD_SDIO" if chip_target == "esp32" else "VDD_SPI"
-        self.espefuse_py('set_flash_voltage OFF', check_msg='Disable internal flash voltage regulator (%s)' % vdd)
-        self.espefuse_py('set_flash_voltage 1.8V', check_msg='Set internal flash voltage regulator (%s) to 1.8V.' % vdd)
+        self.espefuse_py(
+            'set_flash_voltage OFF',
+            check_msg=f'Disable internal flash voltage regulator ({vdd})',
+        )
+        self.espefuse_py(
+            'set_flash_voltage 1.8V',
+            check_msg=f'Set internal flash voltage regulator ({vdd}) to 1.8V.',
+        )
 
     @unittest.skipUnless(chip_target == "esp32", "IO pins 30 & 31 cannot be set for SPI flash only on esp32")
     def test_set_spi_flash_pin_efuses(self):
@@ -354,13 +375,17 @@ class TestBurnCommands(EfuseTestCase):
                              ret_code=2)
             blk1 = "BLOCK_KEY1"
             blk2 = "BLOCK_KEY2"
-        output = self.espefuse_py('burn_efuse {} 0x00010203040506070809111111111111111111111111111111110000112233FF'.format(blk1))
+        output = self.espefuse_py(
+            f'burn_efuse {blk1} 0x00010203040506070809111111111111111111111111111111110000112233FF'
+        )
         self.assertIn('-> 0x00010203040506070809111111111111111111111111111111110000112233ff', output)
         output = self.espefuse_py('summary -d')
         self.assertIn('read_regs: 112233ff 11110000 11111111 11111111 11111111 08091111 04050607 00010203', output)
         self.assertIn('= ff 33 22 11 00 00 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 09 08 07 06 05 04 03 02 01 00 R/W', output)
 
-        output = self.espefuse_py('burn_efuse {}   00010203040506070809111111111111111111111111111111110000112233FF'.format(blk2))
+        output = self.espefuse_py(
+            f'burn_efuse {blk2}   00010203040506070809111111111111111111111111111111110000112233FF'
+        )
         self.assertIn('-> 0xff33221100001111111111111111111111111111111109080706050403020100', output)
         output = self.espefuse_py('summary -d')
         self.assertIn('read_regs: 03020100 07060504 11110908 11111111 11111111 11111111 00001111 ff332211', output)
@@ -403,9 +428,6 @@ class TestBurnCommands(EfuseTestCase):
                               BLOCK2 images/efuse/256bit_1 \
                               BLOCK3 images/efuse/256bit_2')
             output = self.espefuse_py('summary -d')
-            self.check_data_block_in_log(output, "images/efuse/256bit")
-            self.check_data_block_in_log(output, "images/efuse/256bit_1")
-            self.check_data_block_in_log(output, "images/efuse/256bit_2")
         else:
             self.espefuse_py('burn_key \
                               BLOCK_KEY0 images/efuse/256bit   XTS_AES_256_KEY_1 \
@@ -430,9 +452,10 @@ class TestBurnCommands(EfuseTestCase):
                               BLOCK_KEY4 images/efuse/256bit_1 SECURE_BOOT_DIGEST1 \
                               BLOCK_KEY5 images/efuse/256bit_2 SECURE_BOOT_DIGEST2')
             output = self.espefuse_py('summary -d')
-            self.check_data_block_in_log(output, "images/efuse/256bit")
-            self.check_data_block_in_log(output, "images/efuse/256bit_1")
-            self.check_data_block_in_log(output, "images/efuse/256bit_2")
+
+        self.check_data_block_in_log(output, "images/efuse/256bit")
+        self.check_data_block_in_log(output, "images/efuse/256bit_1")
+        self.check_data_block_in_log(output, "images/efuse/256bit_2")
 
     def test_burn_key_with_34_coding_scheme(self):
         if chip_target == "esp32":
@@ -460,12 +483,8 @@ class TestBurnCommands(EfuseTestCase):
 
     def test_burn_block_data_check_args(self):
         self.espefuse_py("burn_block_data -h")
-        if chip_target == "esp32":
-            blk0 = "BLOCK0"
-            blk1 = "BLOCK1"
-        else:
-            blk0 = "BLOCK0"
-            blk1 = "BLOCK1"
+        blk1 = "BLOCK1"
+        blk0 = "BLOCK0"
         self.espefuse_py('burn_block_data \
                           %s images/efuse/224bit \
                           %s' % (blk0, blk1),
@@ -513,15 +532,14 @@ class TestBurnCommands(EfuseTestCase):
 
     def test_burn_block_data_with_offset(self):
         if chip_target == "esp32":
-            blk0 = "BLOCK0"
             blk1 = "BLOCK1"
             blk2 = "BLOCK2"
             blk3 = "BLOCK3"
         else:
-            blk0 = "BLOCK0"
             blk1 = "BLOCK_KEY0"
             blk2 = "BLOCK_KEY1"
             blk3 = "BLOCK_KEY2"
+        blk0 = "BLOCK0"
         self.espefuse_py('burn_block_data \
                             --offset 4\
                             %s images/efuse/192bit \
@@ -709,14 +727,14 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         chip_target = sys.argv[1]
         if chip_target not in support_list_chips:
-            print("Usage: %s - a wrong name of chip" % chip_target)
+            print(f"Usage: {chip_target} - a wrong name of chip")
             sys.exit(1)
         if len(sys.argv) > 3:
             espefuse_port = sys.argv[2]
             reset_port = serial.Serial(sys.argv[3], 115200)
     else:
         chip_target = support_list_chips[0]  # ESP32 by default
-    print("HOST_TEST of espefuse.py for %s" % chip_target)
+    print(f"HOST_TEST of espefuse.py for {chip_target}")
 
     # unittest also uses argv, so trim the args we used
     sys.argv = [sys.argv[0]] + sys.argv[4:]

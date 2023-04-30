@@ -35,7 +35,7 @@ class ReedSoloTests(unittest.TestCase):
 
         for pair in pairs:
             bin_base = bytearray.fromhex(pair[0])
-            encoded_data = rs.encode([x for x in bin_base])  # Encode the original 32 bytes of data
+            encoded_data = rs.encode(list(bin_base))
             self.assertEqual(encoded_data, bytearray.fromhex(pair[0] + pair[1]))
 
 

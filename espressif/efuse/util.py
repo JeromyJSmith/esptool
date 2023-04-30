@@ -23,7 +23,7 @@ def hexify(bitstring, separator=""):
     try:
         as_bytes = tuple(ord(b) for b in bitstring)
     except TypeError:  # python 3, items in bitstring already ints
-        as_bytes = tuple(b for b in bitstring)
+        as_bytes = tuple(bitstring)
     return separator.join(("%02x" % b) for b in as_bytes)
 
 
@@ -35,4 +35,4 @@ def popcnt(b):
 def check_duplicate_name_in_list(name_list):
     duples_name = [name for i, name in enumerate(name_list) if name in name_list[:i]]
     if duples_name != []:
-        raise esptool.FatalError("Found repeated {} in the name list".format(duples_name))
+        raise esptool.FatalError(f"Found repeated {duples_name} in the name list")

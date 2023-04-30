@@ -25,10 +25,10 @@ def read(*names, **kwargs):
 
 def find_version(*file_paths):
     version_file = read(*file_paths)
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-                              version_file, re.M)
-    if version_match:
-        return version_match.group(1)
+    if version_match := re.search(
+        r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M
+    ):
+        return version_match[1]
     raise RuntimeError("Unable to find version string.")
 
 
@@ -110,11 +110,10 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
     ],
-    setup_requires=(
-        ['wheel']
-        if 'bdist_wheel' in sys.argv and sys.version_info[0:2] not in [(3, 4), (3, 5)] else
-        []
-    ),
+    setup_requires=['wheel']
+    if 'bdist_wheel' in sys.argv
+    and sys.version_info[:2] not in [(3, 4), (3, 5)]
+    else [],
     extras_require={
         "dev": [
             'flake8>=3.2.0',

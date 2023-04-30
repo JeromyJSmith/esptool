@@ -129,47 +129,53 @@ The following efuses are burned: VDD_SPI_FORCE, VDD_SPI_XPD, VDD_SPI_TIEH.
 def adc_info(esp, efuses, args):
     print("")
     if efuses["BLOCK2_VERSION"].get() == 1:
-        print("Temperature Sensor Calibration = {}C".format(efuses["TEMP_SENSOR_CAL"].get()))
+        print(f'Temperature Sensor Calibration = {efuses["TEMP_SENSOR_CAL"].get()}C')
 
         print("")
         print("ADC1 readings stored in efuse BLOCK2:")
-        print("    MODE0 D1 reading  (250mV):  {}".format(efuses["ADC1_MODE0_D1"].get()))
-        print("    MODE0 D2 reading  (600mV):  {}".format(efuses["ADC1_MODE0_D2"].get()))
+        print(f'    MODE0 D1 reading  (250mV):  {efuses["ADC1_MODE0_D1"].get()}')
+        print(f'    MODE0 D2 reading  (600mV):  {efuses["ADC1_MODE0_D2"].get()}')
 
-        print("    MODE1 D1 reading  (250mV):  {}".format(efuses["ADC1_MODE1_D1"].get()))
-        print("    MODE1 D2 reading  (800mV):  {}".format(efuses["ADC1_MODE1_D2"].get()))
+        print(f'    MODE1 D1 reading  (250mV):  {efuses["ADC1_MODE1_D1"].get()}')
+        print(f'    MODE1 D2 reading  (800mV):  {efuses["ADC1_MODE1_D2"].get()}')
 
-        print("    MODE2 D1 reading  (250mV):  {}".format(efuses["ADC1_MODE2_D1"].get()))
-        print("    MODE2 D2 reading  (1000mV): {}".format(efuses["ADC1_MODE2_D2"].get()))
+        print(f'    MODE2 D1 reading  (250mV):  {efuses["ADC1_MODE2_D1"].get()}')
+        print(f'    MODE2 D2 reading  (1000mV): {efuses["ADC1_MODE2_D2"].get()}')
 
-        print("    MODE3 D1 reading  (250mV):  {}".format(efuses["ADC1_MODE3_D1"].get()))
-        print("    MODE3 D2 reading  (2000mV): {}".format(efuses["ADC1_MODE3_D2"].get()))
+        print(f'    MODE3 D1 reading  (250mV):  {efuses["ADC1_MODE3_D1"].get()}')
+        print(f'    MODE3 D2 reading  (2000mV): {efuses["ADC1_MODE3_D2"].get()}')
 
         print("")
         print("ADC2 readings stored in efuse BLOCK2:")
-        print("    MODE0 D1 reading  (250mV):  {}".format(efuses["ADC2_MODE0_D1"].get()))
-        print("    MODE0 D2 reading  (600mV):  {}".format(efuses["ADC2_MODE0_D2"].get()))
+        print(f'    MODE0 D1 reading  (250mV):  {efuses["ADC2_MODE0_D1"].get()}')
+        print(f'    MODE0 D2 reading  (600mV):  {efuses["ADC2_MODE0_D2"].get()}')
 
-        print("    MODE1 D1 reading  (250mV):  {}".format(efuses["ADC2_MODE1_D1"].get()))
-        print("    MODE1 D2 reading  (800mV):  {}".format(efuses["ADC2_MODE1_D2"].get()))
+        print(f'    MODE1 D1 reading  (250mV):  {efuses["ADC2_MODE1_D1"].get()}')
+        print(f'    MODE1 D2 reading  (800mV):  {efuses["ADC2_MODE1_D2"].get()}')
 
-        print("    MODE2 D1 reading  (250mV):  {}".format(efuses["ADC2_MODE2_D1"].get()))
-        print("    MODE2 D2 reading  (1000mV): {}".format(efuses["ADC2_MODE2_D2"].get()))
+        print(f'    MODE2 D1 reading  (250mV):  {efuses["ADC2_MODE2_D1"].get()}')
+        print(f'    MODE2 D2 reading  (1000mV): {efuses["ADC2_MODE2_D2"].get()}')
 
-        print("    MODE3 D1 reading  (250mV):  {}".format(efuses["ADC2_MODE3_D1"].get()))
-        print("    MODE3 D2 reading  (2000mV): {}".format(efuses["ADC2_MODE3_D2"].get()))
+        print(f'    MODE3 D1 reading  (250mV):  {efuses["ADC2_MODE3_D1"].get()}')
+        print(f'    MODE3 D2 reading  (2000mV): {efuses["ADC2_MODE3_D2"].get()}')
     else:
-        print("BLOCK2_VERSION = {}".format(efuses["BLOCK2_VERSION"].get_meaning()))
+        print(f'BLOCK2_VERSION = {efuses["BLOCK2_VERSION"].get_meaning()}')
 
 
 def burn_key(esp, efuses, args, digest=None):
     if digest is None:
-        datafile_list = args.keyfile[0:len([name for name in args.keyfile if name is not None]):]
+        datafile_list = args.keyfile[
+            : len([name for name in args.keyfile if name is not None])
+        ]
     else:
-        datafile_list = digest[0:len([name for name in digest if name is not None]):]
+        datafile_list = digest[:len([name for name in digest if name is not None])]
     efuses.force_write_always = args.force_write_always
-    block_name_list = args.block[0:len([name for name in args.block if name is not None]):]
-    keypurpose_list = args.keypurpose[0:len([name for name in args.keypurpose if name is not None]):]
+    block_name_list = args.block[
+        : len([name for name in args.block if name is not None])
+    ]
+    keypurpose_list = args.keypurpose[
+        : len([name for name in args.keypurpose if name is not None])
+    ]
 
     util.check_duplicate_name_in_list(block_name_list)
     if len(block_name_list) != len(datafile_list) or len(block_name_list) != len(keypurpose_list):
@@ -183,23 +189,19 @@ def burn_key(esp, efuses, args, digest=None):
             if block_name == block.name or block_name in block.alias:
                 efuse = efuses[block.name]
         if efuse is None:
-            raise esptool.FatalError("Unknown block name - %s" % (block_name))
+            raise esptool.FatalError(f"Unknown block name - {block_name}")
         num_bytes = efuse.bit_len // 8
 
         block_num = efuses.get_index_block_by_name(block_name)
         block = efuses.blocks[block_num]
 
-        if digest is None:
-            data = datafile.read()
-        else:
-            data = datafile
-
-        print(" - %s" % (efuse.name), end=" ")
+        data = datafile.read() if digest is None else datafile
+        print(f" - {efuse.name}", end=" ")
         revers_msg = None
         if efuses[block.key_purpose_name].need_reverse(keypurpose):
             revers_msg = "\tReversing byte order for AES-XTS hardware peripheral"
             data = data[::-1]
-        print("-> [%s]" % (util.hexify(data, " ")))
+        print(f'-> [{util.hexify(data, " ")}]')
         if revers_msg:
             print(revers_msg)
         if len(data) != num_bytes:
@@ -207,7 +209,7 @@ def burn_key(esp, efuses, args, digest=None):
                                      (len(data), num_bytes, num_bytes * 8))
 
         if efuses[block.key_purpose_name].need_rd_protect(keypurpose):
-            read_protect = False if args.no_read_protect else True
+            read_protect = not args.no_read_protect
         else:
             read_protect = False
         write_protect = not args.no_write_protect
@@ -216,19 +218,19 @@ def burn_key(esp, efuses, args, digest=None):
         efuse.save(data)
 
         disable_wr_protect_key_purpose = False
-        if efuses[block.key_purpose_name].get() != keypurpose:
-            if efuses[block.key_purpose_name].is_writeable():
-                print("\t'%s': '%s' -> '%s'." % (block.key_purpose_name, efuses[block.key_purpose_name].get(), keypurpose))
-                efuses[block.key_purpose_name].save(keypurpose)
-                disable_wr_protect_key_purpose = True
-            else:
-                raise esptool.FatalError("It is not possible to change '%s' to '%s' because write protection bit is set." %
-                                         (block.key_purpose_name, keypurpose))
-        else:
+        if efuses[block.key_purpose_name].get() == keypurpose:
             print("\t'%s' is already '%s'." % (block.key_purpose_name, keypurpose))
             if efuses[block.key_purpose_name].is_writeable():
                 disable_wr_protect_key_purpose = True
 
+        elif efuses[block.key_purpose_name].is_writeable():
+            print("\t'%s': '%s' -> '%s'." % (block.key_purpose_name, efuses[block.key_purpose_name].get(), keypurpose))
+            efuses[block.key_purpose_name].save(keypurpose)
+            disable_wr_protect_key_purpose = True
+        else:
+            raise esptool.FatalError(
+                f"It is not possible to change '{block.key_purpose_name}' to '{keypurpose}' because write protection bit is set."
+            )
         if disable_wr_protect_key_purpose:
             print("\tDisabling write to '%s'." % block.key_purpose_name)
             efuses[block.key_purpose_name].disable_write()
@@ -253,15 +255,19 @@ def burn_key(esp, efuses, args, digest=None):
 
 def burn_key_digest(esp, efuses, args):
     digest_list = []
-    datafile_list = args.keyfile[0:len([name for name in args.keyfile if name is not None]):]
-    block_list = args.block[0:len([block for block in args.block if block is not None]):]
+    datafile_list = args.keyfile[
+        : len([name for name in args.keyfile if name is not None])
+    ]
+    block_list = args.block[
+        : len([block for block in args.block if block is not None])
+    ]
     for block_name, datafile in zip(block_list, datafile_list):
         efuse = None
         for block in efuses.blocks:
             if block_name == block.name or block_name in block.alias:
                 efuse = efuses[block.name]
         if efuse is None:
-            raise esptool.FatalError("Unknown block name - %s" % (block_name))
+            raise esptool.FatalError(f"Unknown block name - {block_name}")
         num_bytes = efuse.bit_len // 8
         digest = espsecure._digest_rsa_public_key(datafile)
         if len(digest) != num_bytes:

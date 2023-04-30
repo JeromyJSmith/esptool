@@ -32,7 +32,7 @@ import esptool  # noqa: E402
 
 def wrap_stub(elf_file):
     """ Wrap an ELF file into a stub 'dict' """
-    print('Wrapping ELF file %s...' % elf_file)
+    print(f'Wrapping ELF file {elf_file}...')
     e = esptool.ELFFile(elf_file)
 
     text_section = e.get_section('.text')
@@ -69,26 +69,27 @@ ESPTOOL_PY = "../esptool.py"
 
 
 def write_python_snippet_to_file(stub_name, stub_data, out_file):
-    print("writing %s stub" % stub_name)
+    print(f"writing {stub_name} stub")
     encoded = base64.b64encode(zlib.compress(repr(stub_data).encode("utf-8"), 9)).decode("utf-8")
-    in_lines = ""
     # split encoded data into 160 character lines
     LINE_LEN = 160
-    for c in range(0, len(encoded), LINE_LEN):
-        in_lines += encoded[c:c + LINE_LEN] + "\\\n"
+    in_lines = "".join(
+        encoded[c : c + LINE_LEN] + "\\\n"
+        for c in range(0, len(encoded), LINE_LEN)
+    )
     out_file.write(PYTHON_TEMPLATE % (stub_name, in_lines))
 
 
 def write_python_snippets(stub_dict, out_file):
     for name, stub_data in stub_dict.items():
         m = re.match(r"stub_flasher_([a-z0-9_]+)", name)
-        key = m.group(1).upper()
+        key = m[1].upper()
         write_python_snippet_to_file(key, stub_data, out_file)
 
 
 def embed_python_snippets(stubs):
     with open(ESPTOOL_PY, 'r') as f:
-        lines = [line for line in f]
+        lines = list(f)
 
     with open(ESPTOOL_PY, "w") as f:
         skip_until = None
@@ -103,8 +104,8 @@ def embed_python_snippets(stubs):
                 f.write(line)
                 continue
 
-            key = m.group(1)
-            stub_data = stubs.get("stub_flasher_%s" % key.lower(), None)
+            key = m[1]
+            stub_data = stubs.get(f"stub_flasher_{key.lower()}", None)
             if not stub_data:
                 f.write(line)
                 continue
@@ -125,9 +126,11 @@ if __name__ == '__main__':
     parser.add_argument("elf_files", nargs="+", help="Stub ELF files to convert")
     args = parser.parse_args()
 
-    stubs = dict((stub_name(elf_file), wrap_stub(elf_file)) for elf_file in args.elf_files)
+    stubs = {
+        stub_name(elf_file): wrap_stub(elf_file) for elf_file in args.elf_files
+    }
     if args.out_file:
-        print('Dumping to Python snippet file %s.' % args.out_file.name)
+        print(f'Dumping to Python snippet file {args.out_file.name}.')
         write_python_snippets(stubs, args.out_file)
     else:
         print('Embedding Python snippets into esptool.py')

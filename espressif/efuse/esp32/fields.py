@@ -35,41 +35,34 @@ class EfuseBlock(base_fields.EfuseBlockBase):
     def __init__(self, parent, param, skip_read=False):
         if skip_read:
             parent.coding_scheme = parent.REGS.CODING_SCHEME_NONE
-        else:
-            if parent.coding_scheme is None:
-                parent.read_coding_scheme()
+        elif parent.coding_scheme is None:
+            parent.read_coding_scheme()
         super(EfuseBlock, self).__init__(parent, param, skip_read=skip_read)
 
     def apply_coding_scheme(self):
         data = self.get_raw(from_read=False)[::-1]
-        if self.get_coding_scheme() == self.parent.REGS.CODING_SCHEME_34:
-            # CODING_SCHEME 3/4 applied only for BLK1..3
-            # Takes 24 byte sequence to be represented in 3/4 encoding,
-            # returns 8 words suitable for writing "encoded" to an efuse block
-            if len(data) != 24:
-                raise esptool.FatalError("Should take 24 bytes for 3/4 encoding.")
-            data = data[:24]
-            outbits = b""
-            while len(data) > 0:  # process in chunks of 6 bytes
-                bits = data[0:6]
-                data = data[6:]
-                xor_res = 0
-                mul_res = 0
-                index = 1
-                for b in struct.unpack("B" * 6, bits):
-                    xor_res ^= b
-                    mul_res += index * util.popcnt(b)
-                    index += 1
-                outbits += bits
-                outbits += struct.pack("BB", xor_res, mul_res)
-            words = struct.unpack("<" + "I" * (len(outbits) // 4), outbits)
-            # returns 8 words
-        else:
+        if self.get_coding_scheme() != self.parent.REGS.CODING_SCHEME_34:
             # CODING_SCHEME NONE applied for BLK0 and BLK1..3
             # BLK0 len = 7 words, BLK1..3 len = 8 words.
-            words = struct.unpack("<" + ("I" * (len(data) // 4)), data)
-            # returns 7 words for BLK0 or 8 words for BLK1..3
-        return words
+            return struct.unpack("<" + ("I" * (len(data) // 4)), data)
+        # CODING_SCHEME 3/4 applied only for BLK1..3
+        # Takes 24 byte sequence to be represented in 3/4 encoding,
+        # returns 8 words suitable for writing "encoded" to an efuse block
+        if len(data) != 24:
+            raise esptool.FatalError("Should take 24 bytes for 3/4 encoding.")
+        data = data[:24]
+        outbits = b""
+        while len(data) > 0:  # process in chunks of 6 bytes
+            bits = data[:6]
+            data = data[6:]
+            xor_res = 0
+            mul_res = 0
+            for index, b in enumerate(struct.unpack("B" * 6, bits), start=1):
+                xor_res ^= b
+                mul_res += index * util.popcnt(b)
+            outbits += bits
+            outbits += struct.pack("BB", xor_res, mul_res)
+        return struct.unpack("<" + "I" * (len(outbits) // 4), outbits)
 
 
 class EspEfuses(base_fields.EspEfusesBase):
@@ -91,7 +84,9 @@ class EspEfuses(base_fields.EspEfusesBase):
         self.debug = debug
         self.do_not_confirm = do_not_confirm
         if esp.CHIP_NAME != "ESP32":
-            raise esptool.FatalError("Expected the 'esp' param for ESP32 chip but got for '%s'." % (esp.CHIP_NAME))
+            raise esptool.FatalError(
+                f"Expected the 'esp' param for ESP32 chip but got for '{esp.CHIP_NAME}'."
+            )
         self.blocks = [EfuseBlock(self, self.Blocks.get(block), skip_read=skip_connect) for block in self.Blocks.BLOCKS]
         self.efuses = [EfuseField.from_tuple(self, self.Fields.get(efuse), self.Fields.get(efuse).class_type) for efuse in self.Fields.EFUSES]
         if skip_connect:
@@ -171,14 +166,13 @@ class EspEfuses(base_fields.EspEfusesBase):
 
     def summary(self):
         if self["XPD_SDIO_FORCE"].get() == 0:
-            output = "Flash voltage (VDD_SDIO) determined by GPIO12 on reset (High for 1.8V, Low/NC for 3.3V)."
+            return "Flash voltage (VDD_SDIO) determined by GPIO12 on reset (High for 1.8V, Low/NC for 3.3V)."
         elif self["XPD_SDIO_REG"].get() == 0:
-            output = "Flash voltage (VDD_SDIO) internal regulator disabled by efuse."
+            return "Flash voltage (VDD_SDIO) internal regulator disabled by efuse."
         elif self["XPD_SDIO_TIEH"].get() == 0:
-            output = "Flash voltage (VDD_SDIO) set to 1.8V by efuse."
+            return "Flash voltage (VDD_SDIO) set to 1.8V by efuse."
         else:
-            output = "Flash voltage (VDD_SDIO) set to 3.3V by efuse."
-        return output
+            return "Flash voltage (VDD_SDIO) set to 3.3V by efuse."
 
 
 class EfuseField(base_fields.EfuseFieldBase):
@@ -223,7 +217,7 @@ class EfuseMacField(EfuseField):
             valid_msg = "(CRC 0x%02x OK)" % stored_crc
         else:
             valid_msg = "(CRC 0x%02x invalid - calculated 0x%02x)" % (stored_crc, computed_crc)
-        return "%s %s" % (util.hexify(raw_mac, ":"), valid_msg)
+        return f'{util.hexify(raw_mac, ":")} {valid_msg}'
 
     @staticmethod
     def calc_crc(raw_mac):
@@ -266,9 +260,8 @@ class EfuseMacField(EfuseField):
                 print_field(mac_version, hex(mac_version_value))
                 mac_version.save(mac_version_value)
             else:
-                if mac_version.get() != 1:
-                    if not self.parent.force_write_always:
-                        raise esptool.FatalError("MAC_VERSION = {}, should be 0 or 1.".format(mac_version.get()))
+                if mac_version.get() != 1 and not self.parent.force_write_always:
+                    raise esptool.FatalError("MAC_VERSION = {}, should be 0 or 1.".format(mac_version.get()))
 
             bitarray_mac = self.convert_to_bitstring(new_value)
             print_field(self, bitarray_mac)
@@ -296,11 +289,11 @@ class EfuseSpiPinField(EfuseField):
 
         new_value_int = int(new_value_str, 0)
 
-        if new_value_int in [30, 31]:
+        if new_value_int in {30, 31}:
             raise esptool.FatalError("IO pins 30 & 31 cannot be set for SPI flash. 0-29, 32 & 33 only.")
         elif new_value_int > 33:
             raise esptool.FatalError("IO pin %d cannot be set for SPI flash. 0-29, 32 & 33 only." % new_value_int)
-        elif new_value_int in [32, 33]:
+        elif new_value_int in {32, 33}:
             return str(new_value_int - 2)
         else:
             return new_value_str

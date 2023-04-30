@@ -43,19 +43,15 @@ class EfuseBlock(base_fields.EfuseBlockBase):
         if len(data) < self.len_of_burn_unit():
             add_empty_bytes = self.len_of_burn_unit() - len(data)
             data = data + (b'\x00' * add_empty_bytes)
-        if self.get_coding_scheme() == self.parent.REGS.CODING_SCHEME_RS:
+        if self.get_coding_scheme() != self.parent.REGS.CODING_SCHEME_RS:
             # takes 32 bytes
-            # apply RS encoding
-            rs = reedsolo.RSCodec(12)
+            return struct.unpack("<" + ("I" * (len(data) // 4)), data)
+        # takes 32 bytes
+        # apply RS encoding
+        rs = reedsolo.RSCodec(12)
             # 32 byte of data + 12 bytes RS
-            encoded_data = rs.encode([x for x in data])
-            words = struct.unpack("<" + "I" * 11, encoded_data)
-            # returns 11 words (8 words of data + 3 words of RS coding)
-        else:
-            # takes 32 bytes
-            words = struct.unpack("<" + ("I" * (len(data) // 4)), data)
-            # returns 8 words
-        return words
+        encoded_data = rs.encode(list(data))
+        return struct.unpack("<" + "I" * 11, encoded_data)
 
 
 class EspEfuses(base_fields.EspEfusesBase):
@@ -77,17 +73,18 @@ class EspEfuses(base_fields.EspEfusesBase):
         self.debug = debug
         self.do_not_confirm = do_not_confirm
         if esp.CHIP_NAME != "ESP32-C3":
-            raise esptool.FatalError("Expected the 'esp' param for ESP32-C3 chip but got for '%s'." % (esp.CHIP_NAME))
+            raise esptool.FatalError(
+                f"Expected the 'esp' param for ESP32-C3 chip but got for '{esp.CHIP_NAME}'."
+            )
         self.blocks = [EfuseBlock(self, self.Blocks.get(block), skip_read=skip_connect) for block in self.Blocks.BLOCKS]
         self.efuses = [EfuseField.from_tuple(self, self.Fields.get(efuse), self.Fields.get(efuse).class_type) for efuse in self.Fields.EFUSES]
         self.efuses += [EfuseField.from_tuple(self, self.Fields.get(efuse), self.Fields.get(efuse).class_type) for efuse in self.Fields.KEYBLOCKS]
         if skip_connect:
             self.efuses += [EfuseField.from_tuple(self, self.Fields.get(efuse), self.Fields.get(efuse).class_type)
                             for efuse in self.Fields.BLOCK2_CALIBRATION_EFUSES]
-        else:
-            if self["BLOCK2_VERSION"].get() == 1:
-                self.efuses += [EfuseField.from_tuple(self, self.Fields.get(efuse), self.Fields.get(efuse).class_type)
-                                for efuse in self.Fields.BLOCK2_CALIBRATION_EFUSES]
+        elif self["BLOCK2_VERSION"].get() == 1:
+            self.efuses += [EfuseField.from_tuple(self, self.Fields.get(efuse), self.Fields.get(efuse).class_type)
+                            for efuse in self.Fields.BLOCK2_CALIBRATION_EFUSES]
 
     def __getitem__(self, efuse_name):
         """ Return the efuse field with the given name """
@@ -204,11 +201,12 @@ class EfuseField(base_fields.EfuseFieldBase):
     def get_info(self):
         output = "%s (BLOCK%d)" % (self.name, self.block)
         if self.efuse_class == "keyblock":
-            err_msg = "0 errors"
             errs, fail = self.parent.get_block_errors(self.block)
             if errs != 0 or fail:
                 err_msg = "ERRORS:%d FAIL:%d" % (errs, fail)
-            output += "(%s):" % err_msg
+            else:
+                err_msg = "0 errors"
+            output += f"({err_msg}):"
             name = self.parent.blocks[self.block].key_purpose_name
             if name is not None:
                 output += "\n  Purpose: %s\n " % (self.parent[name].get())
@@ -237,10 +235,10 @@ class EfuseMacField(EfuseField):
             output = "Block%d has ERRORS:%d FAIL:%d" % (self.block, errs, fail)
         else:
             output = "OK"
-        return "(" + output + ")"
+        return f"({output})"
 
     def get(self, from_read=True):
-        return "%s: %s" % (util.hexify(self.get_raw(from_read), ":"), self.check())
+        return f'{util.hexify(self.get_raw(from_read), ":")}: {self.check()}'
 
     def burn(self, new_value):
         # Writing the BLOCK1 (MAC_SPI_8M_0) default MAC is not sensible, as it's written in the factory.

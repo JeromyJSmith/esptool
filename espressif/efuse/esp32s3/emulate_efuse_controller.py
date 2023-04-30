@@ -60,17 +60,10 @@ class EmulateEfuseController(EmulateEfuseControllerBase):
                 self.save_to_file()
 
     def get_bitlen_of_block(self, blk, wr=False):
-        if blk.id == 0:
-            if wr:
-                return 32 * 8
-            else:
-                return 32 * blk.len
+        if wr:
+            return 32 * 8 if blk.id == 0 else 32 * 8 + 32 * 3
         else:
-            if wr:
-                rs_coding = 32 * 3
-                return 32 * 8 + rs_coding
-            else:
-                return 32 * blk.len
+            return 32 * blk.len
 
     def handle_coding_scheme(self, blk, data):
         if blk.id != 0:
@@ -82,7 +75,7 @@ class EmulateEfuseController(EmulateEfuseControllerBase):
             # apply RS encoding
             rs = reedsolo.RSCodec(coded_bytes)
             # 32 byte of data + 12 bytes RS
-            calc_encoded_data = list(rs.encode([x for x in plain_data]))
+            calc_encoded_data = list(rs.encode(list(plain_data)))
             data.pos = 0
             if calc_encoded_data != data.readlist('44*uint:8')[::-1]:
                 raise FatalError("Error in coding scheme data")

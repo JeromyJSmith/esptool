@@ -67,7 +67,7 @@ class ESPRFC2217Server(object):
     def __init__(self, rfc2217_port=None):
         self.port = rfc2217_port or self.get_free_port()
         self.cmd = [sys.executable, ESPRFC2217SERVER_PY, '-p', str(self.port), serialport]
-        self.server_output_file = open(str(chip) + "_server.out", 'a')
+        self.server_output_file = open(f"{str(chip)}_server.out", 'a')
         self.server_output_file.write("************************************")
         self.p = None
         self.wait_for_server_starts(attempts_count=5)
@@ -111,7 +111,7 @@ class EsptoolTestCase(unittest.TestCase):
     def run_espsecure(self, args):
 
         cmd = [sys.executable, ESPSECURE_PY] + args.split(" ")
-        print("Running %s..." % (" ".join(cmd)))
+        print(f'Running {" ".join(cmd)}...')
         try:
             output = subprocess.check_output([str(s) for s in cmd], cwd=TEST_DIR, stderr=subprocess.STDOUT)
             print(output)  # for more complete stdout logs on failure
@@ -135,7 +135,7 @@ class EsptoolTestCase(unittest.TestCase):
         if chip_name:
             cmd += ["--chip", chip]
         cmd += ["--port", rfc2217_port or serialport, "--baud", str(baud)] + args.split(" ")
-        print("Running %s..." % (" ".join(cmd)))
+        print(f'Running {" ".join(cmd)}...')
         try:
             output = subprocess.check_output([str(s) for s in cmd], cwd=TEST_DIR, stderr=subprocess.STDOUT)
             print(output)  # for more complete stdout logs on failure
@@ -284,7 +284,7 @@ class TestFlashing(EsptoolTestCase):
 
     def test_highspeed_flash_virtual_port(self):
         with ESPRFC2217Server() as server:
-            rfc2217_port = 'rfc2217://localhost:' + str(server.port) + '?ign_set_control'
+            rfc2217_port = f'rfc2217://localhost:{str(server.port)}?ign_set_control'
             self.run_esptool("write_flash 0x0 images/fifty_kb.bin", baud=921600, rfc2217_port=rfc2217_port)
         self.verify_readback(0, 50 * 1024, "images/fifty_kb.bin")
 
@@ -323,9 +323,9 @@ class TestFlashing(EsptoolTestCase):
         self.verify_readback(4096, 50 * 1024, "images/fifty_kb.bin")
 
     def _test_partition_table_then_bootloader(self, args):
-        self.run_esptool(args + " 0x4000 images/partitions_singleapp.bin")
+        self.run_esptool(f"{args} 0x4000 images/partitions_singleapp.bin")
         self.verify_readback(0x4000, 96, "images/partitions_singleapp.bin")
-        self.run_esptool(args + " 0x1000 images/bootloader_esp32.bin")
+        self.run_esptool(f"{args} 0x1000 images/bootloader_esp32.bin")
         self.verify_readback(0x1000, 7888, "images/bootloader_esp32.bin", True)
         self.verify_readback(0x4000, 96, "images/partitions_singleapp.bin")
 
@@ -345,10 +345,10 @@ class TestFlashing(EsptoolTestCase):
 
     def test_length_not_aligned_4bytes(self):
         nodemcu = "nodemcu-master-7-modules-2017-01-19-11-10-03-integer.bin"
-        self.run_esptool("write_flash 0x0 images/%s" % nodemcu)
+        self.run_esptool(f"write_flash 0x0 images/{nodemcu}")
 
     def test_length_not_aligned_4bytes_no_compression(self):
-        self.run_esptool("write_flash -u 0x0 images/%s" % NODEMCU_FILE)
+        self.run_esptool(f"write_flash -u 0x0 images/{NODEMCU_FILE}")
 
     def test_write_overlap(self):
         output = self.run_esptool_error("write_flash 0x0 images/bootloader_esp32.bin 0x1000 images/one_kb.bin")
@@ -372,7 +372,7 @@ class TestFlashing(EsptoolTestCase):
             self.addCleanup(os.remove, f.name)
             file_size = 1024 * 1024
             f.write(b'\x00' * file_size)
-        self.run_esptool("write_flash 0x10000 {}".format(f.name))
+        self.run_esptool(f"write_flash 0x10000 {f.name}")
 
     def test_compressible_non_trivial_file(self):
         with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -381,7 +381,7 @@ class TestFlashing(EsptoolTestCase):
             same_bytes = 8000
             for _ in range(file_size // same_bytes):
                 f.write(struct.pack('B', random.randrange(0, 1 << 8)) * same_bytes)
-        self.run_esptool("write_flash 0x10000 {}".format(f.name))
+        self.run_esptool(f"write_flash 0x10000 {f.name}")
 
     def test_zero_length(self):
         # Zero length files are skipped with a warning
@@ -456,7 +456,7 @@ class TestFlashSizes(EsptoolTestCase):
             }[chip]
             offset = 0x0
         else:
-            self.fail("unsupported chip for test: %s" % chip)
+            self.fail(f"unsupported chip for test: {chip}")
 
         with open(image, "rb") as f:
             f.seek(0, 2)
@@ -553,8 +553,8 @@ class TestVerifyCommand(EsptoolTestCase):
         self.assertIn("first @ 0x00006000", output)
 
     def test_verify_unaligned_length(self):
-        self.run_esptool("write_flash 0x0 images/%s" % NODEMCU_FILE)
-        self.run_esptool("verify_flash 0x0 images/%s" % NODEMCU_FILE)
+        self.run_esptool(f"write_flash 0x0 images/{NODEMCU_FILE}")
+        self.run_esptool(f"verify_flash 0x0 images/{NODEMCU_FILE}")
 
 
 class TestReadIdentityValues(EsptoolTestCase):
@@ -563,7 +563,7 @@ class TestReadIdentityValues(EsptoolTestCase):
         output = self.run_esptool("read_mac")
         mac = re.search(r"[0-9a-f:]{17}", output)
         self.assertIsNotNone(mac)
-        mac = mac.group(0)
+        mac = mac[0]
         self.assertNotEqual("00:00:00:00:00:00", mac)
         self.assertNotEqual("ff:ff:ff:ff:ff:ff", mac)
 
@@ -572,7 +572,7 @@ class TestReadIdentityValues(EsptoolTestCase):
         output = self.run_esptool("chip_id")
         idstr = re.search("Chip ID: 0x([0-9a-f]+)", output)
         self.assertIsNotNone(idstr)
-        idstr = idstr.group(1)
+        idstr = idstr[1]
         self.assertNotEqual("0" * 8, idstr)
         self.assertNotEqual("f" * 8, idstr)
 
@@ -666,7 +666,7 @@ class TestLoadRAM(EsptoolTestCase):
         The "hello world" binary programs for each chip print
         "Hello world!\n" to the serial port.
         """
-        self.run_esptool("load_ram images/ram_helloworld/helloworld-%s.bin" % chip)
+        self.run_esptool(f"load_ram images/ram_helloworld/helloworld-{chip}.bin")
         p = serial.serial_for_url(serialport, default_baudrate)
         p.timeout = 5
         output = p.read(100)
@@ -730,8 +730,8 @@ class TestAutoDetect(EsptoolTestCase):
             "esp32s3": "ESP32-S3",
             "esp32c3": "ESP32-C3",
         }[chip]
-        self.assertIn("Detecting chip type... " + expected_chip_name, output)
-        self.assertIn("Chip is " + expected_chip_name, output)
+        self.assertIn(f"Detecting chip type... {expected_chip_name}", output)
+        self.assertIn(f"Chip is {expected_chip_name}", output)
 
     def test_auto_detect(self):
         output = self.run_esptool("chip_id", chip_name=None)
@@ -739,8 +739,11 @@ class TestAutoDetect(EsptoolTestCase):
 
     def test_auto_detect_virtual_port(self):
         with ESPRFC2217Server() as server:
-            output = self.run_esptool("chip_id", chip_name=None,
-                                      rfc2217_port='rfc2217://localhost:' + str(server.port) + '?ign_set_control')
+            output = self.run_esptool(
+                "chip_id",
+                chip_name=None,
+                rfc2217_port=f'rfc2217://localhost:{str(server.port)}?ign_set_control',
+            )
             self._check_output(output)
 
 
@@ -749,8 +752,7 @@ class TestReadWriteMemory(EsptoolTestCase):
         # find the start of one of these named memory regions
         test_addr = None
         for test_region in ["RTC_DRAM", "RTC_DATA", "DRAM"]:  # find a probably-unused memory type
-            region = esp.get_memory_region(test_region)
-            if region:
+            if region := esp.get_memory_region(test_region):
                 test_addr = region[0]
                 break
 
@@ -779,7 +781,9 @@ class TestReadWriteMemory(EsptoolTestCase):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("Usage: %s [--trace] <serial port> <chip name> [optional default baud rate] [optional tests]" % sys.argv[0])
+        print(
+            f"Usage: {sys.argv[0]} [--trace] <serial port> <chip name> [optional default baud rate] [optional tests]"
+        )
         sys.exit(1)
     serialport = sys.argv[1]
     # chip is already set to sys.argv[2], so @skipUnless can evaluate against it

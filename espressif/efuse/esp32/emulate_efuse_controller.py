@@ -82,17 +82,13 @@ class EmulateEfuseController(EmulateEfuseControllerBase):
     def get_bitlen_of_block(self, blk, wr=False):
         if blk.id == 0:
             return 32 * blk.len
+        coding_scheme = self.read_raw_coding_scheme()
+        if coding_scheme == self.REGS.CODING_SCHEME_NONE:
+            return 32 * blk.len
+        elif coding_scheme == self.REGS.CODING_SCHEME_34:
+            return 32 * 8 if wr else 32 * blk.len * 3 // 4
         else:
-            coding_scheme = self.read_raw_coding_scheme()
-            if coding_scheme == self.REGS.CODING_SCHEME_NONE:
-                return 32 * blk.len
-            elif coding_scheme == self.REGS.CODING_SCHEME_34:
-                if wr:
-                    return 32 * 8
-                else:
-                    return 32 * blk.len * 3 // 4
-            else:
-                raise FatalError("The {} coding scheme is not supported".format(coding_scheme))
+            raise FatalError(f"The {coding_scheme} coding scheme is not supported")
 
     def handle_coding_scheme(self, blk, data):
         # it verifies the coding scheme part of data and returns just data

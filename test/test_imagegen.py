@@ -61,13 +61,16 @@ class BaseTestCase(unittest.TestCase):
         with open(elf, "rb") as f:
             e = ELFFile(f)
             section = e.get_section_by_name(section_name)
-            self.assertTrue(section, "%s should be in the ELF" % section_name)
+            self.assertTrue(section, f"{section_name} should be in the ELF")
             sh_addr = section.header.sh_addr
             data = section.data()
             # no section should start at the same address as the ELF section.
             for seg in sorted(image.segments, key=lambda s: s.addr):
                 print("comparing seg 0x%x sec 0x%x len 0x%x" % (seg.addr, sh_addr, len(data)))
-                self.assertFalse(seg.addr == sh_addr, "%s should not be in the binary image" % section_name)
+                self.assertFalse(
+                    seg.addr == sh_addr,
+                    f"{section_name} should not be in the binary image",
+                )
 
     def assertImageContainsSection(self, image, elf, section_name):
         """
@@ -77,7 +80,7 @@ class BaseTestCase(unittest.TestCase):
         with open(elf, "rb") as f:
             e = ELFFile(f)
             section = e.get_section_by_name(section_name)
-            self.assertTrue(section, "%s should be in the ELF" % section_name)
+            self.assertTrue(section, f"{section_name} should be in the ELF")
             sh_addr = section.header.sh_addr
             data = section.data()
             # section contents may be smeared across multiple image segments,
@@ -88,15 +91,20 @@ class BaseTestCase(unittest.TestCase):
                 print("comparing seg 0x%x sec 0x%x len 0x%x" % (seg.addr, sh_addr, len(data)))
                 if seg.addr == sh_addr:
                     overlap_len = min(len(seg.data), len(data))
-                    self.assertEqual(data[:overlap_len], seg.data[:overlap_len],
-                                     "ELF '%s' section has mis-matching binary image data" % section_name)
+                    self.assertEqual(
+                        data[:overlap_len],
+                        seg.data[:overlap_len],
+                        f"ELF '{section_name}' section has mis-matching binary image data",
+                    )
                     sh_addr += overlap_len
                     data = data[overlap_len:]
 
             # no bytes in 'data' should be left unmatched
-            self.assertEqual(0, len(data),
-                             "ELF %s section '%s' has no encompassing segment(s) in binary image (image segments: %s)"
-                             % (elf, section_name, image.segments))
+            self.assertEqual(
+                0,
+                len(data),
+                f"ELF {elf} section '{section_name}' has no encompassing segment(s) in binary image (image segments: {image.segments})",
+            )
 
     def assertImageInfo(self, binpath, chip="esp8266"):
         """
@@ -119,7 +127,7 @@ class BaseTestCase(unittest.TestCase):
         if version is not None:
             cmd += ["--version", str(version)]
         cmd += [elf_path] + extra_args
-        print("Executing %s" % (" ".join(cmd)))
+        print(f'Executing {" ".join(cmd)}')
         try:
             output = str(subprocess.check_output(cmd))
             print(output)

@@ -45,9 +45,8 @@ class EspEfuseArgs(object):
 class EfuseTestCase(unittest.TestCase):
 
     def setUp(self):
-        # reset and zero efuses
-        serialport.dtr = False
         serialport.rts = True
+        serialport.dtr = False
         time.sleep(0.05)
         serialport.rts = False
         time.sleep(0.05)
@@ -72,8 +71,7 @@ class EfuseTestCase(unittest.TestCase):
             if efuse.name == "CLK8M_FREQ":
                 continue
             val = efuse.get_raw()
-            BAD_EFUSE_MSG = ("Efuse %s not all zeroes - either this is a real ESP32 chip (VERY BAD, read top of file), "
-                             "or the reset is not erasing all efuses correctly.") % efuse.name
+            BAD_EFUSE_MSG = f"Efuse {efuse.name} not all zeroes - either this is a real ESP32 chip (VERY BAD, read top of file), or the reset is not erasing all efuses correctly."
             try:
                 self.assertEqual(b'\x00' * len(val), val, BAD_EFUSE_MSG)
             except TypeError:
@@ -270,7 +268,7 @@ class TestBurnBit(EfuseTestCase):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: %s <serial port> [optional tests]" % sys.argv[0])
+        print(f"Usage: {sys.argv[0]} <serial port> [optional tests]")
         sys.exit(1)
     serialport = serial.Serial(sys.argv[1], 115200)
     serialport.dtr = False

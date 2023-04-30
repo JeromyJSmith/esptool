@@ -18,7 +18,7 @@ def verbose_diff(new, old):
         if len(new[k]) != len(old[k]):
             print("New %s %d bytes, old stub code %d bytes" % (k, len(new[k]), len(old[k])))
         if new[k] != old[k]:
-            print("%s is different" % k)
+            print(f"{k} is different")
             if len(new[k]) == len(old[k]):
                 for b in range(len(new[k])):
                     if new[k][b] != old[k][b]:

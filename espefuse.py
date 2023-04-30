@@ -34,7 +34,7 @@ import esptool
 
 def get_esp(port, baud, connect_mode, chip='auto', skip_connect=False, virt=False, debug=False, virt_efuse_file=None):
     if chip not in ['auto', 'esp32', 'esp32s2', 'esp32s3beta2', 'esp32s3', 'esp32c3', 'esp32h2']:
-        raise esptool.FatalError("get_esp: Unsupported chip (%s)" % chip)
+        raise esptool.FatalError(f"get_esp: Unsupported chip ({chip})")
     if virt:
         esp = {
             'esp32': esp32_efuse,
@@ -44,20 +44,21 @@ def get_esp(port, baud, connect_mode, chip='auto', skip_connect=False, virt=Fals
             'esp32c3': esp32c3_efuse,
             'esp32h2': esp32h2_efuse,
         }.get(chip, esp32_efuse).EmulateEfuseController(virt_efuse_file, debug)
+    elif chip == 'auto' and not skip_connect:
+        esp = esptool.ESPLoader.detect_chip(port, baud, connect_mode)
     else:
-        if chip == 'auto' and not skip_connect:
-            esp = esptool.ESPLoader.detect_chip(port, baud, connect_mode)
-        else:
-            esp = {
-                'esp32': esptool.ESP32ROM,
-                'esp32s2': esptool.ESP32S2ROM,
-                'esp32s3beta2': esptool.ESP32S3BETA2ROM,
-                'esp32s3': esptool.ESP32S3ROM,
-                'esp32c3': esptool.ESP32C3ROM,
-                'esp32h2': esptool.ESP32H2ROM,
-            }.get(chip, esptool.ESP32ROM)(port if not skip_connect else StringIO(), baud)
-            if not skip_connect:
-                esp.connect(connect_mode)
+        esp = {
+            'esp32': esptool.ESP32ROM,
+            'esp32s2': esptool.ESP32S2ROM,
+            'esp32s3beta2': esptool.ESP32S3BETA2ROM,
+            'esp32s3': esptool.ESP32S3ROM,
+            'esp32c3': esptool.ESP32C3ROM,
+            'esp32h2': esptool.ESP32H2ROM,
+        }.get(chip, esptool.ESP32ROM)(
+            StringIO() if skip_connect else port, baud
+        )
+        if not skip_connect:
+            esp.connect(connect_mode)
     return esp
 
 
@@ -72,7 +73,7 @@ def get_efuses(esp, skip_connect=False, debug_mode=False, do_not_confirm=False):
             'ESP32-H2': esp32h2_efuse,
         }[esp.CHIP_NAME]
     except KeyError:
-        raise esptool.FatalError("get_efuses: Unsupported chip (%s)" % esp.CHIP_NAME)
+        raise esptool.FatalError(f"get_efuses: Unsupported chip ({esp.CHIP_NAME})")
     # dict mapping register name to its efuse object
     return (efuse.EspEfuses(esp, skip_connect, debug_mode, do_not_confirm), efuse.operations)
 
@@ -85,8 +86,11 @@ def main(custom_commandline=None):
     as strings. Arguments and their values need to be added as individual items to the list e.g. "--port /dev/ttyUSB1" thus
     becomes ['--port', '/dev/ttyUSB1'].
     """
-    init_parser = argparse.ArgumentParser(description='espefuse.py v%s - [ESP32/S2/S3BETA2/S3/C3/H2] efuse get/set tool' % esptool.__version__,
-                                          prog='espefuse', add_help=False)
+    init_parser = argparse.ArgumentParser(
+        description=f'espefuse.py v{esptool.__version__} - [ESP32/S2/S3BETA2/S3/C3/H2] efuse get/set tool',
+        prog='espefuse',
+        add_help=False,
+    )
 
     init_parser.add_argument('--chip', '-c',
                              help='Target chip type',
@@ -124,7 +128,7 @@ def main(custom_commandline=None):
     efuse_operations.add_commands(subparsers, efuses)
 
     args = parser.parse_args(remaining_args)
-    print('espefuse.py v%s' % esptool.__version__)
+    print(f'espefuse.py v{esptool.__version__}')
     if args.operation is None:
         parser.print_help()
         parser.exit(1)

@@ -44,7 +44,7 @@ class MergeBinTests(unittest.TestCase):
             cmd = [sys.executable, ESPTOOL_PY, "--chip", chip, "merge_bin", "-o", output_file.name] + options
             for (offset, name) in offsets_names:
                 cmd += [hex(offset), name]
-            print("Executing %s" % (" ".join(cmd)))
+            print(f'Executing {" ".join(cmd)}')
 
             output = str(subprocess.check_output(cmd, cwd=IMAGES_DIR, stderr=subprocess.STDOUT))
             print(output)

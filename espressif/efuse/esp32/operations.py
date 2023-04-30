@@ -30,7 +30,10 @@ from ..base_operations import (add_common_commands, add_force_write_always, burn
 
 def add_commands(subparsers, efuses):
     add_common_commands(subparsers, efuses)
-    p = subparsers.add_parser('burn_key', help='Burn a 256-bit key to EFUSE: %s' % ', '.join(efuses.BLOCKS_FOR_KEYS))
+    p = subparsers.add_parser(
+        'burn_key',
+        help=f"Burn a 256-bit key to EFUSE: {', '.join(efuses.BLOCKS_FOR_KEYS)}",
+    )
     p.add_argument('--no-protect-key', help='Disable default read- and write-protecting of the key. '
                    'If this option is not set, once the key is flashed it cannot be read back or changed.', action='store_true')
     add_force_write_always(p)
@@ -75,7 +78,7 @@ def burn_custom_mac(esp, efuses, args):
 def get_custom_mac(esp, efuses, args):
     version = efuses["MAC_VERSION"].get()
     if version > 0:
-        print("Custom MAC Address version {}: {}".format(version, efuses["CUSTOM_MAC"].get()))
+        print(f'Custom MAC Address version {version}: {efuses["CUSTOM_MAC"].get()}')
     else:
         print("Custom MAC Address is not set in the device.")
 
@@ -138,8 +141,12 @@ def adc_info(esp, efuses, args):
 
 
 def burn_key(esp, efuses, args):
-    datafile_list = args.keyfile[0:len([keyfile for keyfile in args.keyfile if keyfile is not None]):]
-    block_name_list = args.block[0:len([block for block in args.block if block is not None]):]
+    datafile_list = args.keyfile[
+        : len([keyfile for keyfile in args.keyfile if keyfile is not None])
+    ]
+    block_name_list = args.block[
+        : len([block for block in args.block if block is not None])
+    ]
     efuses.force_write_always = args.force_write_always
     no_protect_key = args.no_protect_key
 
@@ -154,14 +161,14 @@ def burn_key(esp, efuses, args):
             if block_name == block.name or block_name in block.alias:
                 efuse = efuses[block.name]
         if efuse is None:
-            raise esptool.FatalError("Unknown block name - %s" % (block_name))
+            raise esptool.FatalError(f"Unknown block name - {block_name}")
         num_bytes = efuse.bit_len // 8
         data = datafile.read()
         revers_msg = None
         if block_name in ("flash_encryption", "secure_boot_v1"):
             revers_msg = "\tReversing the byte order"
             data = data[::-1]
-        print(" - %s -> [%s]" % (efuse.name, util.hexify(data, " ")))
+        print(f' - {efuse.name} -> [{util.hexify(data, " ")}]')
         if revers_msg:
             print(revers_msg)
         if len(data) != num_bytes:
@@ -170,10 +177,12 @@ def burn_key(esp, efuses, args):
 
         efuse.save(data)
 
-        if block_name in ("flash_encryption", "secure_boot_v1"):
-            if not no_protect_key:
-                print("\tDisabling read to key block")
-                efuse.disable_read()
+        if (
+            block_name in ("flash_encryption", "secure_boot_v1")
+            and not no_protect_key
+        ):
+            print("\tDisabling read to key block")
+            efuse.disable_read()
 
         if not no_protect_key:
             print("\tDisabling write to key block")
@@ -183,11 +192,11 @@ def burn_key(esp, efuses, args):
     if args.no_protect_key:
         print("Key is left unprotected as per --no-protect-key argument.")
 
-    msg = "Burn keys in efuse blocks"
-    if no_protect_key:
-        msg += "The key block will left readable and writeable (due to --no-protect-key)"
-    else:
-        msg += "The key block will be read and write protected (no further changes or readback)"
+    msg = "Burn keys in efuse blocks" + (
+        "The key block will left readable and writeable (due to --no-protect-key)"
+        if no_protect_key
+        else "The key block will be read and write protected (no further changes or readback)"
+    )
     print(msg)
     efuses.burn_all()
     print("Successful")
@@ -199,7 +208,9 @@ def burn_key_digest(esp, efuses, args):
 
     chip_revision = esp.get_chip_description()
     if "revision 3" not in chip_revision:
-        raise esptool.FatalError("Incorrect chip revision for Secure boot v2. Detected: %s. Expected: (revision 3)" % chip_revision)
+        raise esptool.FatalError(
+            f"Incorrect chip revision for Secure boot v2. Detected: {chip_revision}. Expected: (revision 3)"
+        )
 
     digest = espsecure._digest_rsa_public_key(args.keyfile)
     efuse = efuses["BLOCK2"]
@@ -207,11 +218,11 @@ def burn_key_digest(esp, efuses, args):
     if len(digest) != num_bytes:
         raise esptool.FatalError("Incorrect digest size %d. Digest must be %d bytes (%d bits) of raw binary key data." %
                                  (len(digest), num_bytes, num_bytes * 8))
-    print(" - %s -> [%s]" % (efuse.name, util.hexify(digest, " ")))
+    print(f' - {efuse.name} -> [{util.hexify(digest, " ")}]')
 
     efuse.save(digest)
     if not args.no_protect_key:
-        print("Disabling write to efuse %s..." % (efuse.name))
+        print(f"Disabling write to efuse {efuse.name}...")
         efuse.disable_write()
 
     efuses.burn_all()

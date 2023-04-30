@@ -104,11 +104,13 @@ class EfuseProtectBase(object):
 
     def check_wr_rd_protect(self):
         if not self.is_readable():
-            error_msg = "\t{} is read-protected. The written value can not be read, the efuse/block looks as all 0.\n".format(self.name)
-            error_msg += "\tBurn in this case may damage an already written value."
+            error_msg = (
+                f"\t{self.name} is read-protected. The written value can not be read, the efuse/block looks as all 0.\n"
+                + "\tBurn in this case may damage an already written value."
+            )
             self.parent.print_error_msg(error_msg)
         if not self.is_writeable():
-            error_msg = "\t{} is write-protected. Burn is not possible.".format(self.name)
+            error_msg = f"\t{self.name} is write-protected. Burn is not possible."
             self.parent.print_error_msg(error_msg)
 
 
@@ -150,19 +152,13 @@ class EfuseBlockBase(EfuseProtectBase):
             return self.parent.coding_scheme
 
     def get_raw(self, from_read=True):
-        if from_read:
-            return self.bitarray.bytes
-        else:
-            return self.wr_bitarray.bytes
+        return self.bitarray.bytes if from_read else self.wr_bitarray.bytes
 
     def get(self, from_read=True):
         self.get_bitstring(from_read=from_read)
 
     def get_bitstring(self, from_read=True):
-        if from_read:
-            return self.bitarray
-        else:
-            return self.wr_bitarray
+        return self.bitarray if from_read else self.wr_bitarray
 
     def convert_to_bitstring(self, new_data):
         if isinstance(new_data, BitArray):
@@ -203,49 +199,48 @@ class EfuseBlockBase(EfuseProtectBase):
 
         if self.get_bitstring().all(False):
             print("[{:02}] {:20} is empty, will burn the new value".format(self.id, self.name))
+        elif self.get_bitstring() == wr_data:
+            print("[{:02}] {:20} is already written the same value, continue with EMPTY_BLOCK".format(self.id, self.name))
+            wr_data.set(0)
         else:
-            # the written block in chip is not empty
-            if self.get_bitstring() == wr_data:
-                print("[{:02}] {:20} is already written the same value, continue with EMPTY_BLOCK".format(self.id, self.name))
+            print("[{:02}] {:20} is not empty".format(self.id, self.name))
+            print("\t(written ):", self.get_bitstring())
+            print("\t(to write):", wr_data)
+            mask = self.get_bitstring() & wr_data
+            if mask == wr_data:
+                print("\tAll wr_data bits are set in the written block, continue with EMPTY_BLOCK.")
                 wr_data.set(0)
             else:
-                print("[{:02}] {:20} is not empty".format(self.id, self.name))
-                print("\t(written ):", self.get_bitstring())
-                print("\t(to write):", wr_data)
-                mask = self.get_bitstring() & wr_data
-                if mask == wr_data:
-                    print("\tAll wr_data bits are set in the written block, continue with EMPTY_BLOCK.")
-                    wr_data.set(0)
-                else:
-                    coding_scheme = self.get_coding_scheme()
-                    if coding_scheme == self.parent.REGS.CODING_SCHEME_NONE:
-                        print("\t(coding scheme = NONE)")
-                    elif coding_scheme == self.parent.REGS.CODING_SCHEME_RS:
-                        print("\t(coding scheme = RS)")
-                        error_msg = "\tBurn into %s is forbidden (RS coding scheme does not allow this)." % (self.name)
+                coding_scheme = self.get_coding_scheme()
+                if coding_scheme == self.parent.REGS.CODING_SCHEME_NONE:
+                    print("\t(coding scheme = NONE)")
+                elif coding_scheme == self.parent.REGS.CODING_SCHEME_RS:
+                    print("\t(coding scheme = RS)")
+                    error_msg = "\tBurn into %s is forbidden (RS coding scheme does not allow this)." % (self.name)
+                    self.parent.print_error_msg(error_msg)
+                elif coding_scheme == self.parent.REGS.CODING_SCHEME_34:
+                    print("\t(coding scheme = 3/4)")
+                    data_can_not_be_burn = False
+                    for i in range(0, self.get_bitstring().len, 6 * 8):
+                        rd_chunk = self.get_bitstring()[i:i + 6 * 8:]
+                        wr_chunk = wr_data[i:i + 6 * 8:]
+                        if rd_chunk.any(True) and wr_chunk.any(True):
+                            print("\twritten chunk [%d] and wr_chunk are not empty. " % (i // (6 * 8)), end="")
+                            if rd_chunk == wr_chunk:
+                                print("wr_chunk == rd_chunk. Countinue with empty chunk.")
+                                wr_data[i:i + 6 * 8:].set(0)
+                            else:
+                                print("wr_chunk != rd_chunk. Can not burn.")
+                                print("\twritten ", rd_chunk)
+                                print("\tto write", wr_chunk)
+                                data_can_not_be_burn = True
+                    if data_can_not_be_burn:
+                        error_msg = "\tBurn into %s is forbidden (3/4 coding scheme does not allow this)." % (self.name)
                         self.parent.print_error_msg(error_msg)
-                    elif coding_scheme == self.parent.REGS.CODING_SCHEME_34:
-                        print("\t(coding scheme = 3/4)")
-                        data_can_not_be_burn = False
-                        for i in range(0, self.get_bitstring().len, 6 * 8):
-                            rd_chunk = self.get_bitstring()[i:i + 6 * 8:]
-                            wr_chunk = wr_data[i:i + 6 * 8:]
-                            if rd_chunk.any(True):
-                                if wr_chunk.any(True):
-                                    print("\twritten chunk [%d] and wr_chunk are not empty. " % (i // (6 * 8)), end="")
-                                    if rd_chunk == wr_chunk:
-                                        print("wr_chunk == rd_chunk. Countinue with empty chunk.")
-                                        wr_data[i:i + 6 * 8:].set(0)
-                                    else:
-                                        print("wr_chunk != rd_chunk. Can not burn.")
-                                        print("\twritten ", rd_chunk)
-                                        print("\tto write", wr_chunk)
-                                        data_can_not_be_burn = True
-                        if data_can_not_be_burn:
-                            error_msg = "\tBurn into %s is forbidden (3/4 coding scheme does not allow this)." % (self.name)
-                            self.parent.print_error_msg(error_msg)
-                    else:
-                        raise esptool.FatalError("The coding scheme ({}) is not supported".format(coding_scheme))
+                else:
+                    raise esptool.FatalError(
+                        f"The coding scheme ({coding_scheme}) is not supported"
+                    )
 
     def save(self, new_data):
         # new_data will be checked by check_wr_data() during burn_all()
@@ -257,7 +252,7 @@ class EfuseBlockBase(EfuseProtectBase):
         # *[x] - means a byte.
         data = BitString(bytes=new_data[::-1], length=len(new_data) * 8)
         if self.parent.debug:
-            print("\twritten : {} ->\n\tto write: {}".format(self.get_bitstring(), data))
+            print(f"\twritten : {self.get_bitstring()} ->\n\tto write: {data}")
         self.wr_bitarray.overwrite(data, pos=0)
 
     def burn_words(self, words):
@@ -291,24 +286,27 @@ class EfuseBlockBase(EfuseProtectBase):
         self.burn_words(words)
         self.read()
         if not self.is_readable():
-            print("{} ({}) is read-protected. Read back the burn value is not possible.".format(self.name, self.alias))
+            print(
+                f"{self.name} ({self.alias}) is read-protected. Read back the burn value is not possible."
+            )
             if self.bitarray.all(False):
                 print("Read all '0'")
             else:
                 # Should never happen
-                raise esptool.FatalError("The {} is read-protected but not all '0' ({})".format(self.name, self.bitarray.hex))
+                raise esptool.FatalError(
+                    f"The {self.name} is read-protected but not all '0' ({self.bitarray.hex})"
+                )
+        elif self.wr_bitarray == self.bitarray:
+            print("BURN BLOCK%-2d - OK (write block == read block)" % self.id)
+        elif self.wr_bitarray & self.bitarray == self.wr_bitarray and self.bitarray & before_burn_bitarray == before_burn_bitarray:
+            print("BURN BLOCK%-2d - OK (all write block bits are set)" % self.id)
         else:
-            if self.wr_bitarray == self.bitarray:
-                print("BURN BLOCK%-2d - OK (write block == read block)" % self.id)
-            elif self.wr_bitarray & self.bitarray == self.wr_bitarray and self.bitarray & before_burn_bitarray == before_burn_bitarray:
-                print("BURN BLOCK%-2d - OK (all write block bits are set)" % self.id)
-            else:
-                # Happens only when an efuse is written and read-protected in one command
-                self.print_block(self.wr_bitarray, "Expected")
-                self.print_block(self.bitarray, "Real    ")
+            # Happens only when an efuse is written and read-protected in one command
+            self.print_block(self.wr_bitarray, "Expected")
+            self.print_block(self.bitarray, "Real    ")
                 # Read-protected BLK0 values are reported back as zeros, raise error only for other blocks
-                if self.id != 0:
-                    raise esptool.FatalError("Burn {} ({}) was not successful".format(self.name, self.alias))
+            if self.id != 0:
+                raise esptool.FatalError(f"Burn {self.name} ({self.alias}) was not successful")
         self.wr_bitarray.set(0)
 
 
@@ -349,10 +347,14 @@ class EspEfusesBase(object):
         pass
 
     def get_index_block_by_name(self, name):
-        for block in self.blocks:
-            if block.name == name or name in block.alias:
-                return block.id
-        return None
+        return next(
+            (
+                block.id
+                for block in self.blocks
+                if block.name == name or name in block.alias
+            ),
+            None,
+        )
 
     def read_blocks(self):
         for block in self.blocks:
@@ -399,9 +401,8 @@ class EspEfusesBase(object):
                 sys.exit(0)
 
     def print_error_msg(self, error_msg):
-        if self.force_write_always is not None:
-            if not self.force_write_always:
-                error_msg += "(use '--force-write-always' option to ignore it)"
+        if self.force_write_always is not None and not self.force_write_always:
+            error_msg += "(use '--force-write-always' option to ignore it)"
         if self.force_write_always:
             print(error_msg, "Skipped because '--force-write-always' option.")
         else:
@@ -434,54 +435,46 @@ class EfuseFieldBase(EfuseProtectBase):
         self.update(self.parent.blocks[self.block].bitarray)
 
     def check_format(self, new_value_str):
-        if new_value_str is None:
-            return new_value_str
+        if new_value_str is not None and self.efuse_type.startswith("bytes"):
+            return (
+                binascii.unhexlify(new_value_str[2:])[::-1]
+                if new_value_str.startswith("0x")
+                else binascii.unhexlify(new_value_str)
+            )
         else:
-            if self.efuse_type.startswith("bytes"):
-                if new_value_str.startswith("0x"):
-                    # cmd line: 0x0102030405060708 .... 112233ff      (hex)
-                    # regs: 112233ff ... 05060708 01020304
-                    # BLK: ff 33 22 11 ... 08 07 06 05 04 03 02 01
-                    return binascii.unhexlify(new_value_str[2:])[::-1]
-                else:
-                    # cmd line: 0102030405060708 .... 112233ff        (string)
-                    # regs: 04030201 08070605 ... ff332211
-                    # BLK: 01 02 03 04 05 06 07 08 ... 11 22 33 ff
-                    return binascii.unhexlify(new_value_str)
-            else:
-                return new_value_str
+            return new_value_str
 
     def convert_to_bitstring(self, new_value):
         if isinstance(new_value, BitArray):
             return new_value
+        if self.efuse_type.startswith("bytes"):
+            # new_value (bytes) = [0][1][2] ... [N]             (original data)
+            # in string format  = [0] [1] [2] ... [N]           (util.hexify(data, " "))
+            # in hex format     = 0x[N]....[2][1][0]            (from bitstring print(data))
+            # in reg format     = [3][2][1][0] ... [N][][][]    (as it will be in the device)
+            # in bitstring      = [N] ... [2][1][0]             (to get a correct bitstring need to reverse new_value)
+            # *[x] - means a byte.
+            return BitArray(bytes=new_value[::-1], length=len(new_value) * 8)
         else:
-            if self.efuse_type.startswith("bytes"):
-                # new_value (bytes) = [0][1][2] ... [N]             (original data)
-                # in string format  = [0] [1] [2] ... [N]           (util.hexify(data, " "))
-                # in hex format     = 0x[N]....[2][1][0]            (from bitstring print(data))
-                # in reg format     = [3][2][1][0] ... [N][][][]    (as it will be in the device)
-                # in bitstring      = [N] ... [2][1][0]             (to get a correct bitstring need to reverse new_value)
-                # *[x] - means a byte.
-                return BitArray(bytes=new_value[::-1], length=len(new_value) * 8)
-            else:
-                return BitArray(self.efuse_type + "={}".format(new_value))
+            return BitArray(f"{self.efuse_type}={new_value}")
 
     def check_new_value(self, bitarray_new_value):
         bitarray_old_value = self.get_bitstring()
         if bitarray_new_value.len != bitarray_old_value.len:
-            raise esptool.FatalError("For {} efuse, the length of the new value is wrong, expected {} bits, was {} bits."
-                                     .format(self.name, bitarray_old_value.len, bitarray_new_value.len))
+            raise esptool.FatalError(
+                f"For {self.name} efuse, the length of the new value is wrong, expected {bitarray_old_value.len} bits, was {bitarray_new_value.len} bits."
+            )
         if bitarray_new_value == bitarray_old_value:
-            error_msg = "\tThe same value for {} is already burned. Do not change the efuse.".format(self.name)
+            error_msg = f"\tThe same value for {self.name} is already burned. Do not change the efuse."
             print(error_msg)
             bitarray_new_value.set(0)
         else:
-            if self.name not in ["WR_DIS", "RD_DIS"]:
-                # WR_DIS, RD_DIS fields can have already set bits.
-                # Do not neeed to check below condition for them.
-                if bitarray_new_value | bitarray_old_value != bitarray_new_value:
-                    error_msg = "\tNew value contains some bits that cannot be cleared (value will be {})".format(bitarray_old_value | bitarray_new_value)
-                    self.parent.print_error_msg(error_msg)
+            if (
+                self.name not in ["WR_DIS", "RD_DIS"]
+                and bitarray_new_value | bitarray_old_value != bitarray_new_value
+            ):
+                error_msg = f"\tNew value contains some bits that cannot be cleared (value will be {bitarray_old_value | bitarray_new_value})"
+                self.parent.print_error_msg(error_msg)
             self.check_wr_rd_protect()
 
     def save_to_block(self, bitarray_field):

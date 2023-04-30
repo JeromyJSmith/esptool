@@ -61,7 +61,7 @@ class EmulateEfuseControllerBase(object):
 
     def write_reg(self, addr, value, mask=0xFFFFFFFF, delay_us=0, delay_after_us=0):
         self.mem.pos = self.mem.length - ((addr - self.REGS.DR_REG_EFUSE_BASE) * 8 + 32)
-        self.mem.overwrite("uint:32={}".format(value & mask))
+        self.mem.overwrite(f"uint:32={value & mask}")
         self.handle_writing_event(addr, value)
 
     def update_reg(self, addr, mask, new_val):
@@ -69,7 +69,7 @@ class EmulateEfuseControllerBase(object):
         self.mem.pos = position
         cur_val = self.mem.read("uint:32")
         self.mem.pos = position
-        self.mem.overwrite("uint:32={}".format(cur_val | (new_val & mask)))
+        self.mem.overwrite(f"uint:32={cur_val | new_val & mask}")
 
     def write_efuse(self, n, value, block=0):
         """ Write the nth word of the ESP3x EFUSE region. """
@@ -92,9 +92,8 @@ class EmulateEfuseControllerBase(object):
     def copy_blocks_wr_regs_to_rd_regs(self, updated_block=None):
         for b in reversed(self.Blocks.BLOCKS):
             blk = self.Blocks.get(b)
-            if updated_block is not None:
-                if blk.id != updated_block:
-                    continue
+            if updated_block is not None and blk.id != updated_block:
+                continue
             data = self.read_block(blk.id, wr_regs=True)
             if self.debug:
                 print(blk.name, data.hex)
@@ -122,10 +121,7 @@ class EmulateEfuseControllerBase(object):
                     if field.type.startswith("bytes"):
                         field_len *= 8
                 block.pos = block.length - (field.word * 32 + field.pos + field_len)
-                if bitstring:
-                    return block.read(field_len)
-                else:
-                    return block.read(field.type)
+                return block.read(field_len) if bitstring else block.read(field.type)
         return None
 
     def get_bitlen_of_block(self, blk, wr=False):
@@ -163,12 +159,15 @@ class EmulateEfuseControllerBase(object):
         else:
             for e in self.Fields.EFUSES:
                 field = self.Fields.get(e)
-                if blk.id == field.block and field.block == num_blk:
-                    if field.write_disable_bit is not None and write_disable_bit & (1 << field.write_disable_bit):
-                        data = self.read_field(field.name)
-                        data.set(1)
-                        mask_wr_data.pos = mask_wr_data.length - (field.word * 32 + field.pos + data.len)
-                        mask_wr_data.overwrite(data)
+                if (
+                    blk.id == field.block == num_blk
+                    and field.write_disable_bit is not None
+                    and write_disable_bit & (1 << field.write_disable_bit)
+                ):
+                    data = self.read_field(field.name)
+                    data.set(1)
+                    mask_wr_data.pos = mask_wr_data.length - (field.word * 32 + field.pos + data.len)
+                    mask_wr_data.overwrite(data)
         mask_wr_data.invert()
         return wr_data & mask_wr_data
 

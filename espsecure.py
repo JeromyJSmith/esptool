@@ -56,7 +56,7 @@ def endian_swap_words(source):
     """ Endian-swap each word in 'source' bitstring """
     assert len(source) % 4 == 0
     words = "I" * (len(source) // 4)
-    return struct.pack("<" + words, *struct.unpack(">" + words, source))
+    return struct.pack(f"<{words}", *struct.unpack(f">{words}", source))
 
 
 def swap_word_order(source):
@@ -103,12 +103,11 @@ def digest_secure_bootloader(args):
     # secure boot engine reads in 128 byte blocks (ie SHA512 block
     # size), but also doesn't look for any appended SHA-256 digest
     fw_image = esptool.ESP32FirmwareImage(args.image)
-    if fw_image.append_digest:
-        if len(plaintext_image) % 128 <= 32:
-            # ROM bootloader will read to the end of the 128 byte block, but not
-            # to the end of the SHA-256 digest at the end
-            new_len = len(plaintext_image) - (len(plaintext_image) % 128)
-            plaintext_image = plaintext_image[:new_len]
+    if fw_image.append_digest and len(plaintext_image) % 128 <= 32:
+        # ROM bootloader will read to the end of the 128 byte block, but not
+        # to the end of the SHA-256 digest at the end
+        new_len = len(plaintext_image) - (len(plaintext_image) % 128)
+        plaintext_image = plaintext_image[:new_len]
 
     # if image isn't 128 byte multiple then pad with 0xFF (ie unwritten flash)
     # as this is what the secure boot engine will see
@@ -139,7 +138,7 @@ def digest_secure_bootloader(args):
             digest.update(block[::-1])
 
     if args.output is None:
-        args.output = os.path.splitext(args.image.name)[0] + "-digest-0x0000.bin"
+        args.output = f"{os.path.splitext(args.image.name)[0]}-digest-0x0000.bin"
     with open(args.output, "wb") as f:
         f.write(iv)
         digest = digest.digest()
@@ -147,18 +146,18 @@ def digest_secure_bootloader(args):
             f.write(word[::-1])  # swap word order in the result
         f.write(b'\xFF' * (0x1000 - f.tell()))  # pad to 0x1000
         f.write(plaintext_image)
-    print("digest+image written to %s" % args.output)
+    print(f"digest+image written to {args.output}")
 
 
 def generate_signing_key(args):
     if os.path.exists(args.keyfile):
-        raise esptool.FatalError("ERROR: Key file %s already exists" % args.keyfile)
+        raise esptool.FatalError(f"ERROR: Key file {args.keyfile} already exists")
     if args.version == "1":
         """ Generate an ECDSA signing key for signing secure boot images (post-bootloader) """
         sk = ecdsa.SigningKey.generate(curve=ecdsa.NIST256p)
         with open(args.keyfile, "wb") as f:
             f.write(sk.to_pem())
-        print("ECDSA NIST256p private key in PEM format written to %s" % args.keyfile)
+        print(f"ECDSA NIST256p private key in PEM format written to {args.keyfile}")
     elif args.version == "2":
         """ Generate a RSA 3072 signing key for signing secure boot images """
         private_key = rsa.generate_private_key(
@@ -172,7 +171,7 @@ def generate_signing_key(args):
         )
         with open(args.keyfile, "wb") as f:
             f.write(private_key)
-        print("RSA 3072 private key in PEM format written to %s" % args.keyfile)
+        print(f"RSA 3072 private key in PEM format written to {args.keyfile}")
 
 
 def _load_ecdsa_signing_key(keyfile):
@@ -387,7 +386,7 @@ def verify_signature_v1(args):
         raise esptool.FatalError("Public key uses incorrect curve. ESP32 Secure Boot only supports NIST256p (openssl calls this curve 'prime256v1")
 
     binary_content = args.datafile.read()
-    data = binary_content[0:-68]
+    data = binary_content[:-68]
     sig_version, signature = struct.unpack("I64s", binary_content[-68:])
     if sig_version != 0:
         raise esptool.FatalError("Signature block has version %d. This version  of espsecure only supports version 0." % sig_version)
@@ -440,7 +439,9 @@ def verify_signature_v2(args):
         sig_data = struct.unpack("<BBxx32s384sI384sI384sI16x", sig_blk)
 
         if sig_data[2] != digest:
-            raise esptool.FatalError("Signature block image digest does not match the actual image digest %s. Expected %s." % (digest, sig_data[2]))
+            raise esptool.FatalError(
+                f"Signature block image digest does not match the actual image digest {digest}. Expected {sig_data[2]}."
+            )
 
         try:
             vk.verify(
@@ -475,7 +476,9 @@ def extract_public_key(args):
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         args.public_keyfile.write(vk)
-    print("%s public key extracted to %s" % (args.keyfile.name, args.public_keyfile.name))
+    print(
+        f"{args.keyfile.name} public key extracted to {args.public_keyfile.name}"
+    )
 
 
 def _sha256_digest(data):
@@ -536,7 +539,9 @@ def digest_rsa_public_key(args):
     _check_output_is_not_input(args.keyfile, args.output)
     public_key_digest = _digest_rsa_public_key(args.keyfile)
     with open(args.output, "wb") as f:
-        print("Writing the public key digest of %s to %s." % (args.keyfile.name, args.output))
+        print(
+            f"Writing the public key digest of {args.keyfile.name} to {args.output}."
+        )
         f.write(public_key_digest)
 
 
@@ -548,7 +553,7 @@ def digest_private_key(args):
     digest.update(sk.to_string())
     result = digest.digest()
     if args.keylen == 192:
-        result = result[0:24]
+        result = result[:24]
     args.digest_file.write(result)
     print("SHA-256 digest of private key %s%s written to %s" % (args.keyfile.name,
                                                                 "" if args.keylen == 256
@@ -768,7 +773,7 @@ def _flash_encryption_operation_aes_xts(output_file, input_file, flash_address, 
         flash_address += 0x80   # for next block
 
         if len(tweak) != 16:
-            raise esptool.FatalError("Length of tweak must be 16, was {}".format(len(tweak)))
+            raise esptool.FatalError(f"Length of tweak must be 16, was {len(tweak)}")
 
         cipher = Cipher(algorithms.AES(key), modes.XTS(tweak), backend=backend)
         encryptor = cipher.decryptor() if do_decrypt else cipher.encryptor()
@@ -785,7 +790,9 @@ def _flash_encryption_operation_aes_xts(output_file, input_file, flash_address, 
 
     # output length matches original input
     if len(output) != len(indata) - pad_left - pad_right:
-        raise esptool.FatalError("Length of input data ({}) should match the output data ({})".format(len(indata) - pad_left - pad_right, len(output)))
+        raise esptool.FatalError(
+            f"Length of input data ({len(indata) - pad_left - pad_right}) should match the output data ({len(output)})"
+        )
 
     output_file.write(output)
 
@@ -794,7 +801,7 @@ def _split_blocks(text, block_len=16):
     """ Take a bitstring, split it into chunks of "block_len" each """
     assert len(text) % block_len == 0
     while len(text) > 0:
-        yield text[0:block_len]
+        yield text[:block_len]
         text = text[block_len:]
 
 
@@ -832,7 +839,9 @@ def _check_output_is_not_input(input_file, output_file):
     # i & o still can be something else when espsecure was imported and the functions used directly (e.g. io.BytesIO())
     check_f = _samefile if isinstance(i, _string_type) and isinstance(o, _string_type) else operator.eq
     if check_f(i, o):
-        raise esptool.FatalError('The input "{}" and output "{}" should not be the same!'.format(i, o))
+        raise esptool.FatalError(
+            f'The input "{i}" and output "{o}" should not be the same!'
+        )
 
 
 class OutFileType(object):
@@ -853,7 +862,7 @@ class OutFileType(object):
         return self
 
     def __repr__(self):
-        return '{}({})'.format(type(self).__name__, self.path)
+        return f'{type(self).__name__}({self.path})'
 
     def write(self, payload):
         if len(payload) > 0:
@@ -879,7 +888,10 @@ def main(custom_commandline=None):
     as strings. Arguments and their values need to be added as individual items to the list e.g. "--port /dev/ttyUSB1" thus
     becomes ['--port', '/dev/ttyUSB1'].
     """
-    parser = argparse.ArgumentParser(description='espsecure.py v%s - ESP32 Secure Boot & Flash Encryption tool' % esptool.__version__, prog='espsecure')
+    parser = argparse.ArgumentParser(
+        description=f'espsecure.py v{esptool.__version__} - ESP32 Secure Boot & Flash Encryption tool',
+        prog='espsecure',
+    )
 
     subparsers = parser.add_subparsers(
         dest='operation',
@@ -969,7 +981,7 @@ def main(custom_commandline=None):
     p.add_argument('plaintext_file', help="File with plaintext content for encrypting", type=argparse.FileType('rb'))
 
     args = parser.parse_args(custom_commandline)
-    print('espsecure.py v%s' % esptool.__version__)
+    print(f'espsecure.py v{esptool.__version__}')
     if args.operation is None:
         parser.print_help()
         parser.exit(1)
